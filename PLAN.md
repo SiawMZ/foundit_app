@@ -1,0 +1,56 @@
+# Linkbox — plan
+
+One place for posts saved across Instagram, Xiaohongshu, TikTok, Facebook and the web.
+Tapping a saved link opens it in the original app.
+
+## Decisions
+
+| Topic | Decision |
+|---|---|
+| Client | Expo (SDK 58) + Expo Router + TypeScript. Android + web from one codebase. |
+| Backend | Supabase: Postgres, auth, storage, edge functions. |
+| Share into app | Android `ACTION_SEND` intent filter + a small local Expo module (`modules/share-receiver`). `expo-share-intent` does not support SDK 58 yet. |
+| Enrichment | Edge function `enrich`: resolves short links, fetches preview (oEmbed / Open Graph), copies the thumbnail into storage (platform image URLs expire), asks Claude for a short description + labels. |
+| Labels | AI creates them freely, English, lowercase, 1–4 per link. Stored as `text[]` on the link. User can edit. |
+| Folders | One link → at most one folder. |
+| Auth | Email + password (single user for now, ready for more later via RLS). |
+| Search/filter/sort | Done on the client over all of the user's links (fast for thousands of rows). |
+
+## Data model
+
+```
+folders  (id, user_id, name, created_at)                      unique(user_id, name)
+links    (id, user_id, url, normalized_url, resolved_url, platform,
+          title, description, author, thumbnail_url, shared_text,
+          note, labels text[], folder_id → folders, pinned,
+          status: pending | ready | failed, error,
+          created_at, updated_at)                               unique(user_id, normalized_url)
+```
+
+Row-level security: every row is readable/writable only by its `user_id`.
+
+## Save flow
+
+1. Share from another app (or paste on web) → client extracts the first URL from the shared text,
+   normalizes it (strips tracking params), detects platform, inserts a `pending` row.
+   Duplicate → show the existing link instead.
+2. Client calls `enrich(link_id)`; UI shows a placeholder card until status becomes `ready`/`failed`.
+3. On failure the card still works: platform icon, shared text, editable title.
+
+## MVP (this phase)
+
+- [x] Sign in / sign up
+- [x] Grid of links with thumbnail, title, description, platform, labels
+- [x] Add by paste (web + Android), share from other apps (Android)
+- [x] Auto preview + AI labels
+- [x] Folders: create / rename / delete, move link
+- [x] Search, filter (platform, folder, label), sort (date, name)
+- [x] Link detail: open in original app, edit title/note/labels/folder, pin, delete
+
+## Later
+
+- Quick-save overlay (translucent activity) instead of opening the full app
+- Import Instagram / TikTok data exports
+- Dead-link checks, bulk edit, export (JSON/CSV)
+- Design pass (typography, spacing, motion, dark mode polish), onboarding
+- Publishing: privacy policy, account deletion, private storage bucket with signed URLs
