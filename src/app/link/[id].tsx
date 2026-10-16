@@ -1,16 +1,16 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PLATFORM_NAMES } from '../../../supabase/functions/_shared/url';
 import { FolderPicker } from '@/components/folder-picker';
 import { LabelEditor } from '@/components/label-editor';
-import { Button, Field, SectionLabel } from '@/components/ui';
+import { Button, Field, SectionLabel, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { openLink, thumbnailUrl } from '@/lib/open';
 import { useStore } from '@/lib/store';
-import { font, radius, space, useColors } from '@/lib/theme';
+import { space, useColors } from '@/lib/theme';
 
 export default function LinkDetail() {
   const c = useColors();
@@ -23,7 +23,7 @@ export default function LinkDetail() {
   if (!link) {
     return (
       <Frame title="">
-        <Text style={{ color: c.muted, textAlign: 'center' }}>This link no longer exists.</Text>
+        <T tone="muted" style={{ textAlign: 'center' }}>This link no longer exists.</T>
       </Frame>
     );
   }
@@ -47,18 +47,18 @@ export default function LinkDetail() {
         <Button label={`Open in ${PLATFORM_NAMES[link.platform]}`} onPress={() => openLink(link)} />
 
         <View style={{ gap: space.xs }}>
-          <Text style={[styles.meta, { color: c.muted }]}>
+          <T variant="label" tone="muted">
             Saved {new Date(link.created_at).toLocaleDateString()}
             {link.author ? ` · ${link.author}` : ''}
             {link.status === 'pending' ? ' · fetching preview…' : ''}
-          </Text>
-          {link.description ? <Text style={[styles.desc, { color: c.text }]}>{link.description}</Text> : null}
+          </T>
+          {link.description ? <T>{link.description}</T> : null}
           {link.status === 'failed' && link.error ? (
-            <Text style={[styles.meta, { color: c.muted }]}>Preview unavailable: {link.error}</Text>
+            <T variant="small" tone="muted">Preview unavailable: {link.error}</T>
           ) : null}
-          <Text style={[styles.url, { color: c.muted }]} numberOfLines={2} selectable>
+          <T variant="small" tone="muted" numberOfLines={2} selectable>
             {link.resolved_url ?? link.url}
-          </Text>
+          </T>
         </View>
 
         <SavedField
@@ -70,12 +70,12 @@ export default function LinkDetail() {
         />
 
         <View style={{ gap: space.sm }}>
-          <SectionLabel>Labels</SectionLabel>
+          <SectionLabel index="01">Labels</SectionLabel>
           <LabelEditor labels={link.labels} onChange={(labels) => save({ labels })} />
         </View>
 
         <View style={{ gap: space.sm }}>
-          <SectionLabel>Folder</SectionLabel>
+          <SectionLabel index="02">Folder</SectionLabel>
           <FolderPicker value={link.folder_id} onChange={(folder_id) => save({ folder_id })} />
         </View>
 
@@ -88,7 +88,7 @@ export default function LinkDetail() {
           onSave={(note) => save({ note })}
         />
 
-        {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
+        {error ? <T tone="danger">{error}</T> : null}
 
         <View style={styles.actions}>
           <Button
@@ -112,7 +112,7 @@ export default function LinkDetail() {
 
 function close() {
   if (router.canGoBack()) router.back();
-  else router.replace('/');
+  else router.replace('/(tabs)');
 }
 
 /**
@@ -163,10 +163,10 @@ function Frame({ title, children }: { title: string; children: ReactNode }) {
         accessibilityLabel="Close details"
       />
       <View style={[styles.panel, { backgroundColor: c.bg, borderColor: c.border }]}>
-        <View style={[styles.panelHeader, { borderColor: c.border }]}>
-          <Text style={[styles.panelTitle, { color: c.text }]}>{title}</Text>
+        <View style={[styles.panelHeader, { borderColor: c.line }]}>
+          <T variant="label">{title}</T>
           <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
-            <Text style={{ color: c.text, fontSize: font.xl, lineHeight: font.xl }}>×</Text>
+            <T variant="title">×</T>
           </Pressable>
         </View>
         {body}
@@ -200,22 +200,18 @@ function SavedField({
 
 const styles = StyleSheet.create({
   container: { padding: space.xl, gap: space.xl, width: '100%', maxWidth: 640, alignSelf: 'center' },
-  image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg },
-  meta: { fontSize: font.sm },
-  desc: { fontSize: font.md, lineHeight: 22 },
-  url: { fontSize: font.xs },
+  image: { width: '100%', aspectRatio: 1 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   actions: { flexDirection: 'row', gap: space.md },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
   backdrop: { backgroundColor: 'rgba(0,0,0,0.55)' },
-  panel: { width: '100%', maxWidth: 640, maxHeight: '92%', borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  panel: { width: '100%', maxWidth: 640, maxHeight: '92%', borderWidth: 2, overflow: 'hidden' },
   panelHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: space.xl,
     paddingVertical: space.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
   },
-  panelTitle: { fontSize: font.lg, fontWeight: '600' },
 });

@@ -1,33 +1,80 @@
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme, useWindowDimensions, type TextStyle } from 'react-native';
 
+/**
+ * Swiss (International Typographic) style: white paper, black type, one red for action,
+ * sharp corners, strong rules, flush-left grotesk type.
+ */
 const light = {
   bg: '#FFFFFF',
-  surface: '#F5F5F5',
-  border: '#E5E5E5',
-  text: '#0A0A0A',
-  muted: '#737373',
+  surface: '#F2F2F0',
+  /** Strong rules and outlines. */
+  line: '#000000',
+  /** Hairline dividers. */
+  border: '#DCDCDA',
+  text: '#000000',
+  muted: '#707070',
   inverse: '#FFFFFF',
-  accent: '#0A0A0A',
-  danger: '#B91C1C',
+  /** Swiss red: primary actions, the active item, highlights. */
+  accent: '#E3000F',
+  onAccent: '#FFFFFF',
+  danger: '#E3000F',
+  backdrop: 'rgba(0,0,0,0.5)',
 };
 
 const dark: typeof light = {
-  bg: '#0A0A0A',
-  surface: '#171717',
-  border: '#262626',
-  text: '#FAFAFA',
-  muted: '#A3A3A3',
-  inverse: '#0A0A0A',
-  accent: '#FAFAFA',
-  danger: '#F87171',
+  bg: '#0B0B0B',
+  surface: '#181818',
+  line: '#F2F2F2',
+  border: '#2B2B2B',
+  text: '#F2F2F2',
+  muted: '#9A9A9A',
+  inverse: '#0B0B0B',
+  accent: '#FF2B2B',
+  onAccent: '#FFFFFF',
+  danger: '#FF2B2B',
+  backdrop: 'rgba(0,0,0,0.7)',
 };
 
 export type Colors = typeof light;
 
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const radius = { sm: 6, md: 10, lg: 14, pill: 999 };
-export const font = { xs: 11, sm: 13, md: 15, lg: 17, xl: 22, xxl: 28 };
-
 export function useColors(): Colors {
   return useColorScheme() === 'dark' ? dark : light;
+}
+
+/** 4-pt grid. */
+export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
+
+/** Swiss style is square. Kept as tokens so a softer look stays a one-line change. */
+export const radius = { sm: 0, md: 0, lg: 0, pill: 0 };
+
+export const fonts = {
+  regular: 'InterTight_400Regular',
+  medium: 'InterTight_500Medium',
+  bold: 'InterTight_700Bold',
+  black: 'InterTight_800ExtraBold',
+};
+
+/** Type scale. Use through <T variant="…"> rather than ad-hoc font sizes. */
+export const type = {
+  display: { fontFamily: fonts.black, fontSize: 40, lineHeight: 42, letterSpacing: -1.4 },
+  title: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 28, letterSpacing: -0.6 },
+  heading: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
+  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21 },
+  bodyStrong: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 21 },
+  small: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
+  label: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.1, textTransform: 'uppercase' },
+  number: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 14, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
+} satisfies Record<string, TextStyle>;
+
+export type TypeVariant = keyof typeof type;
+
+/** Wide layouts (desktop web, tablets) get the sidebar instead of bottom tabs. */
+export function useIsWide() {
+  const { width } = useWindowDimensions();
+  return width >= (Platform.OS === 'web' ? 900 : 1000);
+}
+
+/** Two-digit index used for Swiss-style numbering: 01, 02 … */
+export function pad2(n: number) {
+  return String(n).padStart(2, '0');
 }

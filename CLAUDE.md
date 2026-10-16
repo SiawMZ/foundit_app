@@ -19,13 +19,21 @@ when scope changes. Setup and commands are in [README.md](README.md).
 - **Folders:** a link is in at most one folder.
 - **Sharing:** sharing a post from another app must save it without opening the app and pasting.
 - **Web:** can save links by pasting. Link details open as a panel that closes on click-outside / Escape.
+- **Navigation:** bottom tabs on phones (Links, Folders, Tags, Profile); the same sections as a left
+  sidebar (with the folder list) on wide screens. Folder/tag filters are URL params on the Links tab.
+- **Selecting:** long-press a card (or "Select") to multi-select; bulk move to folder or delete.
+- **Shared folders:** read-only public page at `/s/<token>`, no sign-in; notes are never exposed;
+  the owner can turn the link off.
 - **Priority:** working features first; a full design pass comes later.
 
-## Style
+## Style: Swiss (International Typographic Style)
 
-Minimal, clean, grid-based, mostly black and white (dark mode follows the system).
-Use the tokens in `src/lib/theme.ts` (`useColors`, `space`, `radius`, `font`) and the primitives in
-`src/components/ui.tsx` — no new colors or one-off spacing values.
+White paper, black type, **one red** (`accent`) for primary actions and the active item; sharp corners;
+strong 2px rules; flush-left grotesk type (Inter Tight); numbered sections (01, 02 …); big numerals.
+Dark mode follows the system. All text goes through `<T variant tone>` and the type scale in
+`src/lib/theme.ts`; use `useColors`, `space`, `fonts`, `type` and the primitives in
+`src/components/ui.tsx` (Button, Field, Chip, Check, Rule, SectionLabel, ScreenHeader, Sheet) —
+no new colors, fonts or one-off sizes, and no `fontWeight` (use `fonts.*`, it's what Android needs).
 
 ## Architecture notes
 
@@ -38,6 +46,11 @@ Use the tokens in `src/lib/theme.ts` (`useColors`, `space`, `radius`, `font`) an
   (bot checks / login walls like google.com/sorry).
 - Android share intake is a local Expo module (`modules/share-receiver`) because `expo-share-intent`
   doesn't support SDK 58. It needs a dev/EAS build; Expo Go can't receive shares.
+- Routes: `src/app/(tabs)/` (index = Links, folders, tags, profile) with `components/nav-bar.tsx` as the
+  custom tab bar / sidebar; `add`, `link/[id]`, `sign-in`, and the public `s/[token]` outside the tabs.
+- Folder sharing: `share_folder` RPC (security invoker) sets a token; `get_shared_folder` (security
+  definer, anon-callable) returns only public fields. Share URLs need `EXPO_PUBLIC_WEB_URL` on phones.
+- `delete-account` edge function removes the user's thumbnails then the auth user (rows cascade).
 - Data and auth live in `src/lib/store.tsx`. Loading is driven by `onAuthStateChange`
   (the lint rule forbids setState directly in effects).
 
@@ -51,6 +64,11 @@ Use the tokens in `src/lib/theme.ts` (`useColors`, `space`, `radius`, `font`) an
 - Deno refuses npm versions published < 24h ago; pin `npm:@anthropic-ai/sdk@<version>` to an older release.
 - App checks: `npx tsc --noEmit` and `npx eslint src modules` (`npx expo lint` fails on the installed
   ESLint version). Edge function: `deno check` inside `supabase/functions/enrich`.
+- `.env.local` points at the **hosted** project (used by the owner's phone). To preview against the local
+  stack use the `web-local` launch config (`.claude/web-local.mjs`, port 8090), which overrides the env
+  for that process only. Don't run two dev servers long-term: both rewrite `.expo/types/router.d.ts`;
+  if route types look stale (`/index`, stray non-route entries), restart a server and re-run tsc.
+- Hosted changes need deploying: `npx supabase db push`, `npx supabase functions deploy <name>`.
 - Local test account credentials are in `.env.local` (`LOCAL_TEST_*`, gitignored). `npx supabase db reset`
   wipes it; recreate with the auth signup endpoint.
 

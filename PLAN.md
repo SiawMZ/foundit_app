@@ -55,13 +55,42 @@ Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the An
 - [x] Link detail: open in original app, edit title/note/labels/folder, pin, delete
 - [x] Label suggestions while typing
 - [x] Web: details panel closes on click-outside / Escape
-- [ ] Test the Android share flow on the owner's phone (hosted Supabase + EAS build)
-- [ ] Turn on AI labels (set `ANTHROPIC_API_KEY`)
+- [x] Turn on AI labels (Claude Haiku 5.5)
+- [ ] Test the Android share flow on the owner's phone (dev build installed; share sheet not confirmed yet)
+
+## Phase 2 — features and Swiss redesign (2026-10-16)
+
+- [x] Swiss Style: Inter Tight, black/white + one red, sharp corners, numbered sections
+- [x] Tabs on phone (Links, Folders, Tags, Profile), sidebar with folders on wide screens
+- [x] Clearly different header actions (outlined "Select", red "+ Add")
+- [x] Multi-select cards → move to folder / delete
+- [x] Tag pool with search that lights up matching tags; tap a tag to filter
+- [x] Profile: stats, change password, sign out, export JSON, delete account
+- [x] Shareable read-only folder links (`/s/<token>`), revocable
+- [x] Previews for Xiaohongshu (embedded page data) and Threads (Meta crawler)
+- [ ] Deploy to hosted Supabase: `db push` (folder sharing) and deploy `enrich` + `delete-account`
+- [ ] Host the web app (needed for share links to work for others), then set `EXPO_PUBLIC_WEB_URL`
+- [ ] Standalone "preview" APK that works without the PC (EAS env vars for Supabase URL/key)
+
+## Suggested next
+
+- Offline save queue for shares made without internet
+- One-time onboarding showing "Share → Linkbox"
+- Bulk add/remove labels in selection mode
 
 ## Later
 
 - Quick-save overlay (translucent activity) instead of opening the full app
 - Import Instagram / TikTok data exports
-- Dead-link checks, bulk edit, export (JSON/CSV)
-- Design pass (typography, spacing, motion, dark mode polish), onboarding
-- Publishing: privacy policy, account deletion, private storage bucket with signed URLs
+- Dead-link checks, CSV export
+- Design polish: motion, empty-state illustrations, app icon and splash in the Swiss style
+- Publishing: privacy policy, private storage bucket with signed URLs
+
+## Fix before deploying / publishing
+
+- **Email confirmation lands on a broken page.** The confirmation link confirms the account, then
+  redirects to the Supabase **Site URL**, which still has the default `http://localhost:3000`, so users
+  see an error or unrelated page. Fix: set Authentication → URL Configuration → Site URL to the hosted
+  web app (and add it to Redirect URLs), make sure **Confirm email** is on, and ideally have the
+  link open the app on phones (deep link via the `linkbox://` scheme) with a "You're confirmed — sign in"
+  screen. Found 2026-10-16 while testing on Android.

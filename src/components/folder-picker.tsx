@@ -10,7 +10,8 @@ export function FolderPicker({
   value,
   onChange,
 }: {
-  value: string | null;
+  /** undefined = nothing chosen yet (bulk move). */
+  value: string | null | undefined;
   onChange: (folderId: string | null) => void;
 }) {
   const { folders, createFolder } = useStore();

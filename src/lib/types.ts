@@ -28,7 +28,18 @@ export type Folder = {
   id: string;
   user_id: string;
   name: string;
+  /** Set while the folder has a public read-only link. */
+  share_token: string | null;
   created_at: string;
+};
+
+/** What the public share page receives (see get_shared_folder in the migrations). */
+export type SharedFolder = {
+  name: string;
+  links: Pick<
+    Link,
+    'id' | 'url' | 'platform' | 'title' | 'description' | 'author' | 'thumbnail_path' | 'shared_text' | 'labels' | 'created_at'
+  >[];
 };
 
 export type LinkPatch = Partial<Pick<Link, 'title' | 'note' | 'labels' | 'folder_id' | 'pinned'>>;

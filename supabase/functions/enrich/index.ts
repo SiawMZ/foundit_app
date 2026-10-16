@@ -17,8 +17,9 @@ const CORS = {
 
 const BROWSER_UA =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36';
-// Meta serves Open Graph tags to its own crawler without a login wall.
+// Meta (Instagram, Facebook, Threads) serves Open Graph tags to its own crawler without a login wall.
 const CRAWLER_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
+const META_PLATFORMS = new Set<Platform>(['instagram', 'facebook', 'threads']);
 
 const MAX_HTML_BYTES = 1_500_000;
 const MAX_IMAGE_BYTES = 5_000_000;
@@ -102,7 +103,7 @@ Deno.serve(async (req) => {
 
 async function fetchPreview(url: string, platform: Platform): Promise<Preview> {
   // Follow short links (xhslink.com, vm.tiktok.com, fb.watch…) to the real post.
-  const ua = platform === 'instagram' || platform === 'facebook' ? CRAWLER_UA : BROWSER_UA;
+  const ua = META_PLATFORMS.has(platform) ? CRAWLER_UA : BROWSER_UA;
   let resolvedUrl = url;
   let page: Preview = { resolvedUrl: url };
   try {
@@ -111,11 +112,27 @@ async function fetchPreview(url: string, platform: Platform): Promise<Preview> {
       redirect: 'follow',
       signal: AbortSignal.timeout(10_000),
     });
-    // A redirect off the platform is a bot check or login wall (google.com/sorry, …), not the post.
-    const leftPlatform = platform !== 'web' && detectPlatform(res.url) !== platform;
-    if (res.url && !leftPlatform) resolvedUrl = res.url;
-    if (!leftPlatform && res.ok && (res.headers.get('content-type') ?? '').includes('html')) {
-      page = { resolvedUrl, ...parseMeta(await readLimited(res, MAX_HTML_BYTES), resolvedUrl) };
+    // A redirect off the platform or to a login page is a bot check / login wall, not the post
+    // (google.com/sorry, xiaohongshu.com/login …).
+    const blocked =
+      (platform !== 'web' && detectPlatform(res.url) !== platform) || isLoginPage(res.url);
+    if (res.url && !blocked) resolvedUrl = res.url;
+    if (!blocked && res.ok && (res.headers.get('content-type') ?? '').includes('html')) {
+      const html = await readLimited(res, MAX_HTML_BYTES);
+      const meta = parseMeta(html, resolvedUrl);
+      // Xiaohongshu has no Open Graph tags; the post is embedded as JSON in the page.
+      const embedded = platform === 'xiaohongshu' ? parseXiaohongshuState(html) : {};
+      page = {
+        resolvedUrl,
+        title: meta.title ?? embedded.title,
+        description: meta.description ?? embedded.description,
+        // Threads reports og:site_name ("Threads"); the handle is in the title ("@name on Threads").
+        author:
+          (platform === 'threads' ? meta.title?.match(/^(@\S+) on Threads/)?.[1] : undefined) ??
+          meta.author ??
+          embedded.author,
+        image: meta.image ?? embedded.image,
+      };
     } else {
       res.body?.cancel().catch(() => {});
     }
@@ -177,6 +194,37 @@ function parseMeta(html: string, baseUrl: string): Omit<Preview, 'resolvedUrl'> 
     description: meta(['og:description', 'twitter:description', 'description']),
     author: meta(['author', 'article:author', 'og:site_name']),
     image: image ? new URL(image, baseUrl).toString() : undefined,
+  };
+}
+
+function isLoginPage(url: string) {
+  try {
+    return /^\/(login|accounts\/login|signin)\b/i.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+/** Reads the note out of Xiaohongshu's `window.__INITIAL_STATE__` JSON (escaped strings, `/` slashes). */
+function parseXiaohongshuState(html: string): Omit<Preview, 'resolvedUrl'> {
+  const start = html.indexOf('__INITIAL_STATE__');
+  if (start === -1) return {};
+  const state = html.slice(start);
+  const str = (re: RegExp) => {
+    const m = state.match(re);
+    if (!m?.[1]) return undefined;
+    try {
+      return (JSON.parse(`"${m[1]}"`) as string).trim() || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const image = str(/"imageList":\[\{[^\]]*?"url":"((?:[^"\\]|\\.)*)"/);
+  return {
+    title: str(/"title":"((?:[^"\\]|\\.)+)","interactInfo"/) ?? str(/"title":"((?:[^"\\]|\\.)+)"/),
+    description: str(/"desc":"((?:[^"\\]|\\.)+)"/)?.slice(0, 500),
+    author: str(/"nickname":"((?:[^"\\]|\\.)+)"/),
+    image: image?.replace(/^http:/, 'https:'),
   };
 }
 

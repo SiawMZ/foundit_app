@@ -22,10 +22,15 @@ type Store = {
   saveFromText: (text: string, folderId?: string | null) => Promise<SaveResult>;
   updateLink: (id: string, patch: LinkPatch) => Promise<void>;
   deleteLink: (id: string) => Promise<void>;
+  moveLinks: (ids: string[], folderId: string | null) => Promise<void>;
+  deleteLinks: (ids: string[]) => Promise<void>;
   enrich: (id: string) => Promise<void>;
   createFolder: (name: string) => Promise<Folder>;
   renameFolder: (id: string, name: string) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
+  /** Returns the folder's share token, creating one if needed. */
+  shareFolder: (id: string) => Promise<string>;
+  unshareFolder: (id: string) => Promise<void>;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -170,6 +175,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLinks((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
+  const moveLinks = useCallback(async (ids: string[], folderId: string | null) => {
+    if (!ids.length) return;
+    const { error } = await supabase.from('links').update({ folder_id: folderId }).in('id', ids);
+    if (error) throw error;
+    const set = new Set(ids);
+    setLinks((prev) => prev.map((l) => (set.has(l.id) ? { ...l, folder_id: folderId } : l)));
+  }, []);
+
+  const deleteLinks = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    const { error } = await supabase.from('links').delete().in('id', ids);
+    if (error) throw error;
+    const set = new Set(ids);
+    setLinks((prev) => prev.filter((l) => !set.has(l.id)));
+  }, []);
+
+  const shareFolder = useCallback(async (id: string) => {
+    const { data, error } = await supabase.rpc('share_folder', { p_folder: id });
+    if (error) throw error;
+    if (typeof data !== 'string') throw new Error('Could not create a share link.');
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, share_token: data } : f)));
+    return data;
+  }, []);
+
+  const unshareFolder = useCallback(async (id: string) => {
+    const { error } = await supabase.from('folders').update({ share_token: null }).eq('id', id);
+    if (error) throw error;
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, share_token: null } : f)));
+  }, []);
+
   const createFolder = useCallback(async (name: string) => {
     const { data, error } = await supabase.from('folders').insert({ name: name.trim() }).select().single();
     if (error) throw error.code === '23505' ? new Error('A folder with that name already exists.') : error;
@@ -208,8 +243,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       createFolder,
       renameFolder,
       deleteFolder,
+      moveLinks,
+      deleteLinks,
+      shareFolder,
+      unshareFolder,
     }),
-    [session, authReady, links, folders, loading, refresh, saveFromText, updateLink, deleteLink, enrich, createFolder, renameFolder, deleteFolder],
+    [session, authReady, links, folders, loading, refresh, saveFromText, updateLink, deleteLink, enrich, createFolder, renameFolder, deleteFolder, moveLinks, deleteLinks, shareFolder, unshareFolder],
   );
 
   return <StoreContext value={value}>{children}</StoreContext>;

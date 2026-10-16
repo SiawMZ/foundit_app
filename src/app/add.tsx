@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PLATFORM_NAMES } from '../../supabase/functions/_shared/url';
 import { FolderPicker } from '@/components/folder-picker';
-import { Button, Field, SectionLabel } from '@/components/ui';
+import { Button, Field, SectionLabel, T } from '@/components/ui';
 import { displayTitle } from '@/lib/filter';
 import { useStore, type SaveResult } from '@/lib/store';
-import { font, radius, space, useColors } from '@/lib/theme';
+import { space, useColors } from '@/lib/theme';
 
 /**
  * Two ways in:
@@ -57,7 +57,7 @@ export default function Add() {
 
   function done() {
     if (router.canGoBack()) router.back();
-    else router.replace('/');
+    else router.replace('/(tabs)');
     // Came from another app's share sheet: drop back into that app.
     if (shared && Platform.OS === 'android') BackHandler.exitApp();
   }
@@ -69,9 +69,9 @@ export default function Add() {
       keyboardShouldPersistTaps="handled">
       {!saved ? (
         <>
+          <SectionLabel index="01">Link</SectionLabel>
           <Field
-            label="Link or shared text"
-            placeholder="https://www.instagram.com/p/…"
+            placeholder="Paste a link or the text an app shared"
             value={text}
             onChangeText={setText}
             autoCapitalize="none"
@@ -79,31 +79,29 @@ export default function Add() {
             autoFocus={!shared}
             multiline
           />
-          <SectionLabel>Folder</SectionLabel>
+          <SectionLabel index="02">Folder</SectionLabel>
           <FolderPicker value={folderId} onChange={setFolderId} />
-          {error ? <Text style={{ color: c.danger, fontSize: font.sm }}>{error}</Text> : null}
+          {error ? <T tone="danger">{error}</T> : null}
           <Button label="Save" onPress={() => save(text, folderId)} loading={busy} disabled={!text.trim()} />
         </>
       ) : (
         <>
-          <View style={[styles.preview, { borderColor: c.border }]}>
-            <Text style={[styles.status, { color: c.muted }]}>
+          <View style={[styles.preview, { borderColor: c.line }]}>
+            <T variant="label" tone={result?.duplicate ? 'muted' : 'accent'}>
               {result?.duplicate ? 'Already saved' : 'Saved'} · {PLATFORM_NAMES[saved.platform]}
               {saved.status === 'pending' ? ' · fetching preview…' : ''}
-            </Text>
-            <Text style={[styles.title, { color: c.text }]} numberOfLines={3}>
+            </T>
+            <T variant="title" numberOfLines={3}>
               {displayTitle(saved)}
-            </Text>
+            </T>
             {saved.description ? (
-              <Text style={{ color: c.muted, fontSize: font.sm }} numberOfLines={3}>
+              <T variant="small" tone="muted" numberOfLines={3}>
                 {saved.description}
-              </Text>
+              </T>
             ) : null}
-            {saved.labels.length ? (
-              <Text style={{ color: c.text, fontSize: font.sm }}>{saved.labels.map((l) => `#${l}`).join('  ')}</Text>
-            ) : null}
+            {saved.labels.length ? <T variant="small">{saved.labels.map((l) => `#${l}`).join('  ')}</T> : null}
           </View>
-          <SectionLabel>Folder</SectionLabel>
+          <SectionLabel index="01">Folder</SectionLabel>
           <FolderPicker value={folderId} onChange={chooseFolder} />
           <Button label="Done" onPress={done} />
           {!shared ? (
@@ -124,7 +122,5 @@ export default function Add() {
 
 const styles = StyleSheet.create({
   container: { padding: space.xl, gap: space.lg, width: '100%', maxWidth: 560, alignSelf: 'center' },
-  preview: { borderWidth: 1, borderRadius: radius.lg, padding: space.lg, gap: space.sm },
-  status: { fontSize: font.xs, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: font.lg, fontWeight: '600', lineHeight: 24 },
+  preview: { borderWidth: 2, padding: space.lg, gap: space.sm },
 });
