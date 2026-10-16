@@ -15,7 +15,7 @@ Tapping a saved link opens it in the original app.
 | Enrichment | Edge function `enrich`: resolves short links, fetches preview (oEmbed / Open Graph), copies the thumbnail into storage (platform image URLs expire), asks Claude for a short description + labels. |
 | Labels | AI creates them freely, English, lowercase, 1–4 per link, reusing existing ones. Stored as `text[]` on the link. User can edit; the field suggests existing labels. |
 | Folders | One link → at most one folder. |
-| Auth | Email + password (single user for now, ready for more later via RLS). |
+| Auth | Email + password (with confirm-password on sign-up and a reset-password email), plus Google. Ready for more users via RLS. |
 | Search/filter/sort | Done on the client over all of the user's links (fast for thousands of rows). |
 
 ## Data model
@@ -75,7 +75,10 @@ Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the An
 - [x] Standalone "preview" APK built 2026-10-16
 - [x] EAS Update configured (channel `preview`, runtime = app version); needs one rebuild to take effect
 - [ ] Install the EAS-Update-enabled preview build and confirm an update arrives
-- [ ] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app (fixes the confirmation redirect below)
+- [ ] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app, Redirect URLs =
+      `https://founditapp-red.vercel.app/**` and `linkbox://**` (confirm + reset emails and Google sign-in need these)
+- [x] Login: forgot password (email → `/reset-password`), confirm password on sign-up, Google button (2026-10-16)
+- [ ] Turn on Google in hosted Supabase (see README → Google sign-in); the button stays hidden until then
 
 ## Suggested next
 

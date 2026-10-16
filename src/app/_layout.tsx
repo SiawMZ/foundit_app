@@ -72,6 +72,8 @@ function RootStack() {
         </Stack.Protected>
         {/* Public, read-only shared folders — no sign-in needed. */}
         <Stack.Screen name="s/[token]" options={{ headerShown: false }} />
+        {/* Password-reset email lands here with a recovery session (or an error if the link expired). */}
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
       </Stack>
     </>
   );

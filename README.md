@@ -81,6 +81,20 @@ Updates only reach builds with the same app version (runtime policy `appVersion`
 
 The website updates itself: Vercel redeploys on every push to `main`.
 
+## Google sign-in
+
+The "Continue with Google" button only appears once Google is enabled for the Supabase project.
+
+1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth client ID** → type *Web application*.
+   Authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
+2. Supabase dashboard → Authentication → Sign In / Providers → **Google**: enable, paste the client ID and secret.
+3. Authentication → URL Configuration: Site URL `https://founditapp-red.vercel.app`; Redirect URLs
+   `https://founditapp-red.vercel.app/**` and `linkbox://**` (the phone app returns through its scheme).
+
+Password-reset and confirmation emails always link to the web app (`/reset-password`, `/`), so they also need
+those redirect URLs. Locally, `supabase/config.toml` already allows `http://localhost:8090/**`; open the emails
+in Mailpit at http://127.0.0.1:54324.
+
 ## Notes
 
 - Instagram and Facebook often hide previews behind a login. The link still saves and opens; the title falls back to the shared text, and you can edit it.
