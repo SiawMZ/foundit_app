@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PLATFORM_NAMES } from '../../../supabase/functions/_shared/url';
 import { FolderPicker } from '@/components/folder-picker';
-import { Button, Chip, Field, SectionLabel } from '@/components/ui';
+import { LabelEditor } from '@/components/label-editor';
+import { Button, Field, SectionLabel } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { openLink, thumbnailUrl } from '@/lib/open';
 import { useStore } from '@/lib/store';
@@ -17,37 +18,28 @@ export default function LinkDetail() {
   const { links, updateLink, deleteLink, enrich } = useStore();
   const link = links.find((l) => l.id === id);
 
-  const [newLabel, setNewLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!link) {
     return (
-      <View style={[styles.missing, { backgroundColor: c.bg }]}>
-        <Text style={{ color: c.muted }}>This link no longer exists.</Text>
-      </View>
+      <Frame title="">
+        <Text style={{ color: c.muted, textAlign: 'center' }}>This link no longer exists.</Text>
+      </Frame>
     );
   }
 
   const save = (patch: Parameters<typeof updateLink>[1]) =>
     updateLink(link.id, patch).catch((e) => setError(e instanceof Error ? e.message : 'Could not save'));
 
-  function addLabel() {
-    const l = newLabel.trim().toLowerCase().replace(/^#/, '');
-    setNewLabel('');
-    if (l && !link!.labels.includes(l)) void save({ labels: [...link!.labels, l] });
-  }
-
   async function remove() {
     if (await confirm('Delete link?', 'This removes it from Linkbox only, not from the original app.')) {
       await deleteLink(link!.id);
-      router.back();
+      close();
     }
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: PLATFORM_NAMES[link.platform] }} />
-      <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <Frame title={PLATFORM_NAMES[link.platform]}>
         {thumbnailUrl(link) ? (
           <Image source={thumbnailUrl(link)} style={[styles.image, { backgroundColor: c.surface }]} contentFit="cover" />
         ) : null}
@@ -79,16 +71,7 @@ export default function LinkDetail() {
 
         <View style={{ gap: space.sm }}>
           <SectionLabel>Labels</SectionLabel>
-          <View style={styles.wrap}>
-            {link.labels.map((l) => (
-              <Chip
-                key={l}
-                label={`${l}  ×`}
-                onPress={() => save({ labels: link.labels.filter((x) => x !== l) })}
-              />
-            ))}
-          </View>
-          <Field placeholder="Add label and press enter" value={newLabel} onChangeText={setNewLabel} onSubmitEditing={addLabel} autoCapitalize="none" />
+          <LabelEditor labels={link.labels} onChange={(labels) => save({ labels })} />
         </View>
 
         <View style={{ gap: space.sm }}>
@@ -123,8 +106,72 @@ export default function LinkDetail() {
           />
         </View>
         <Button variant="danger" label="Delete" onPress={remove} />
-      </ScrollView>
-    </>
+    </Frame>
+  );
+}
+
+function close() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
+
+/**
+ * Phone: a normal screen. Web: a centered panel over the grid that closes when you click
+ * the backdrop, press Escape or the × button.
+ */
+function Frame({ title, children }: { title: string; children: ReactNode }) {
+  const c = useColors();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // Capture phase: react-native-web text inputs stop key events from bubbling.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const el = document.activeElement;
+      // First Escape leaves the field (which saves it), the next one closes the panel.
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.blur();
+      else close();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  const body = (
+    <ScrollView
+      style={Platform.OS === 'web' ? undefined : { backgroundColor: c.bg }}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled">
+      {children}
+    </ScrollView>
+  );
+
+  if (Platform.OS !== 'web') {
+    return (
+      <>
+        <Stack.Screen options={{ title }} />
+        {body}
+      </>
+    );
+  }
+
+  return (
+    <View style={styles.overlay}>
+      <Pressable
+        style={[StyleSheet.absoluteFill, styles.backdrop]}
+        onPress={close}
+        accessibilityRole="button"
+        accessibilityLabel="Close details"
+      />
+      <View style={[styles.panel, { backgroundColor: c.bg, borderColor: c.border }]}>
+        <View style={[styles.panelHeader, { borderColor: c.border }]}>
+          <Text style={[styles.panelTitle, { color: c.text }]}>{title}</Text>
+          <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+            <Text style={{ color: c.text, fontSize: font.xl, lineHeight: font.xl }}>×</Text>
+          </Pressable>
+        </View>
+        {body}
+      </View>
+    </View>
   );
 }
 
@@ -159,5 +206,16 @@ const styles = StyleSheet.create({
   url: { fontSize: font.xs },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   actions: { flexDirection: 'row', gap: space.md },
-  missing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.55)' },
+  panel: { width: '100%', maxWidth: 640, maxHeight: '92%', borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: space.xl,
+    paddingVertical: space.md,
+    borderBottomWidth: 1,
+  },
+  panelTitle: { fontSize: font.lg, fontWeight: '600' },
 });

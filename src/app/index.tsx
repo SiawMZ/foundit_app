@@ -81,10 +81,10 @@ export default function Home() {
       ) : null}
       {labels.length ? (
         <Row>
-          {labels.map(([l, n]) => (
+          {labels.map(([l]) => (
             <Chip
               key={l}
-              label={`# ${l}  ${n}`}
+              label={`# ${l}`}
               active={filter.label === l}
               onPress={() => set({ label: filter.label === l ? null : l })}
             />
