@@ -41,8 +41,9 @@ Row-level security: every row is readable/writable only by its `user_id`.
 
 ## Status
 
-Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the Android share sheet
-(needs an EAS build) and AI labels (needs `ANTHROPIC_API_KEY`).
+Live (2026-10-17): web on Vercel, Android standalone `preview` build 1.0.1 with EAS Update, hosted
+Supabase with AI labels (Haiku 5.5). Share sheet verified on the owner's phone. No EAS update has been
+published yet, so update delivery is still unproven.
 
 ## MVP (this phase)
 
@@ -78,7 +79,8 @@ Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the An
 - [ ] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app, Redirect URLs =
       `https://founditapp-red.vercel.app/**` and `linkbox://**` (confirm + reset emails and Google sign-in need these)
 - [x] Login: forgot password (email → `/reset-password`), confirm password on sign-up, Google button (2026-10-16)
-- [ ] Turn on Google in hosted Supabase (see README → Google sign-in); the button stays hidden until then
+- [x] Google provider enabled in hosted Supabase (seen 2026-10-17) — still to confirm sign-in end to end
+      once the redirect URLs above are set
 
 ## Suggested next
 
@@ -95,6 +97,13 @@ Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the An
 - Publishing: privacy policy, private storage bucket with signed URLs
 
 ## Fix before deploying / publishing
+
+- **Server fetches any URL a user saves** (`enrich`): block private/loopback addresses and non-http(s)
+  schemes before fetching (SSRF), and cap redirects.
+- **No rate limit on `enrich`**: each call can spend Anthropic credit; limit calls per user per hour.
+- **Free Supabase projects pause after ~7 days without activity**; upgrade or keep it active once others rely on it.
+- **No error reporting** from the phone app or functions (e.g. Sentry / EAS Observe); needed before strangers use it.
+- **Final name, icon and Android package** must be settled before the first Play Store upload (the package is permanent).
 
 - **Email confirmation lands on a broken page.** The confirmation link confirms the account, then
   redirects to the Supabase **Site URL**, which still has the default `http://localhost:3000`, so users
