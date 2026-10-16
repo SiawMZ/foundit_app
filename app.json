@@ -7,9 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "linkbox",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
+    "ios": {},
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
@@ -51,6 +49,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "ab61fa57-7ab2-4d79-b486-32334c1f6562"
+      }
     }
   }
 }

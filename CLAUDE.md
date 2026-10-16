@@ -44,6 +44,10 @@ Use the tokens in `src/lib/theme.ts` (`useColors`, `space`, `radius`, `font`) an
 ## Gotchas
 
 - react-native-web `TextInput` stops keydown propagation — listen in the capture phase for global keys.
+- EAS Build installs with `npm ci` on npm 10 (local is npm 11), which is stricter about peer dependencies.
+  After changing dependencies, check the lock file in a scratch copy with
+  `npx npm@10.9.9 ci --include=dev --ignore-scripts --dry-run`. The `overrides` entry in package.json
+  exists for this: expo-modules-core's optional peer range doesn't include the worklets version Reanimated needs.
 - Deno refuses npm versions published < 24h ago; pin `npm:@anthropic-ai/sdk@<version>` to an older release.
 - App checks: `npx tsc --noEmit` and `npx eslint src modules` (`npx expo lint` fails on the installed
   ESLint version). Edge function: `deno check` inside `supabase/functions/enrich`.
