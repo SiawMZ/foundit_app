@@ -56,7 +56,7 @@ Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the An
 - [x] Label suggestions while typing
 - [x] Web: details panel closes on click-outside / Escape
 - [x] Turn on AI labels (Claude Haiku 5.5)
-- [ ] Test the Android share flow on the owner's phone (dev build installed; share sheet not confirmed yet)
+- [x] Test the Android share flow on the owner's phone (Instagram → Linkbox works on phone and web)
 
 ## Phase 2 — features and Swiss redesign (2026-10-16)
 
@@ -68,9 +68,14 @@ Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the An
 - [x] Profile: stats, change password, sign out, export JSON, delete account
 - [x] Shareable read-only folder links (`/s/<token>`), revocable
 - [x] Previews for Xiaohongshu (embedded page data) and Threads (Meta crawler)
-- [ ] Deploy to hosted Supabase: `db push` (folder sharing) and deploy `enrich` + `delete-account`
-- [ ] Host the web app (needed for share links to work for others), then set `EXPO_PUBLIC_WEB_URL`
-- [ ] Standalone "preview" APK that works without the PC (EAS env vars for Supabase URL/key)
+- [x] Deploy to hosted Supabase: `db push` (folder sharing) and deploy `enrich` + `delete-account`
+- [x] Host the web app on Vercel: https://founditapp-red.vercel.app (builds from GitHub `main`)
+- [x] Vercel env vars point at the hosted Supabase (verified 2026-10-16)
+- [x] EAS env vars (preview + production): Supabase URL/key and `EXPO_PUBLIC_WEB_URL`
+- [x] Standalone "preview" APK built 2026-10-16
+- [x] EAS Update configured (channel `preview`, runtime = app version); needs one rebuild to take effect
+- [ ] Install the EAS-Update-enabled preview build and confirm an update arrives
+- [ ] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app (fixes the confirmation redirect below)
 
 ## Suggested next
 

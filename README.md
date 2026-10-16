@@ -61,6 +61,26 @@ The phone can't reach `127.0.0.1` on your PC, so use a hosted Supabase project:
 
 The share-sheet entry only exists in these builds — **Expo Go can't receive shares**.
 
+## Updating the phone app (EAS Update)
+
+The standalone app (`preview` build) downloads new versions of the app's code by itself.
+After changing app code, publish an update:
+
+```bash
+npm run update:phone -- "What changed"
+```
+
+On the phone, fully close Linkbox and reopen it. The first launch downloads the update in the
+background; the next launch runs it (so it can take up to two restarts).
+
+Updates can only change JavaScript, styling and images. **A new build is needed** when you:
+add a package with native code, change native settings in `app.json` (permissions, intent filters,
+icons, splash), or upgrade the Expo SDK. Then bump `expo.version` in `app.json` (e.g. 1.0.0 → 1.0.1)
+and rebuild with `npx eas-cli@latest build --profile preview --platform android`.
+Updates only reach builds with the same app version (runtime policy `appVersion`).
+
+The website updates itself: Vercel redeploys on every push to `main`.
+
 ## Notes
 
 - Instagram and Facebook often hide previews behind a login. The link still saves and opens; the title falls back to the shared text, and you can edit it.

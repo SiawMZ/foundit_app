@@ -76,3 +76,10 @@ no new colors, fonts or one-off sizes, and no `fontWeight` (use `fonts.*`, it's 
 
 - Commit and push to `main` on https://github.com/SiawMZ/foundit_app only when the owner asks.
 - Verify UI changes in the browser (web) before reporting them done.
+- Shipping: the website redeploys from `main` on Vercel (https://founditapp-red.vercel.app). The phone
+  app (standalone `preview` build, channel `preview`) gets JS changes via EAS Update:
+  `npm run update:phone -- "message"` — publishing reaches the owner's installed app, so only do it when
+  asked. Native changes (new native package, native app.json config, SDK upgrade) need a rebuild:
+  bump `expo.version` first (runtime policy `appVersion`), then `eas build --profile preview`.
+- `npx eas-cli@latest update:configure` once duplicated the Android intent filter in app.json — check
+  app.json after any EAS CLI command that rewrites config.
