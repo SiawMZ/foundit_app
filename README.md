@@ -66,4 +66,4 @@ The share-sheet entry only exists in these builds — **Expo Go can't receive sh
 - Instagram and Facebook often hide previews behind a login. The link still saves and opens; the title falls back to the shared text, and you can edit it.
 - Thumbnails are copied into Supabase Storage because platform image URLs expire.
 - The thumbnails bucket is public with unguessable paths. Switch to a private bucket + signed URLs before publishing.
-- `ENRICH_MODEL` (function secret) changes the model used for labels; default `claude-opus-5-5`.
+- `ENRICH_MODEL` (function secret) changes the model used for labels; default `claude-haiku-5-5` (about $0.10 per 1,000 links).

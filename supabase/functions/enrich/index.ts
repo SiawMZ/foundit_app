@@ -22,7 +22,7 @@ const CRAWLER_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhi
 
 const MAX_HTML_BYTES = 1_500_000;
 const MAX_IMAGE_BYTES = 5_000_000;
-const MODEL = Deno.env.get('ENRICH_MODEL') ?? 'claude-opus-5-5';
+const MODEL = Deno.env.get('ENRICH_MODEL') ?? 'claude-haiku-5-5';
 
 type Preview = {
   resolvedUrl: string;
