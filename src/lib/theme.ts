@@ -1,34 +1,37 @@
 import { Platform, useColorScheme, useWindowDimensions, type TextStyle } from 'react-native';
 
 /**
- * Swiss (International Typographic) style: white paper, black type, one red for action,
+ * Swiss (International Typographic) style: warm grey paper, black type, one red for action,
  * sharp corners, strong rules, flush-left grotesk type.
  */
 const light = {
-  bg: '#FFFFFF',
-  surface: '#F2F2F0',
+  /** Warm paper grey (uncoated poster stock); also the app icon's background. */
+  bg: '#F2F0EB',
+  surface: '#E8E5DD',
   /** Strong rules and outlines. */
   line: '#000000',
   /** Hairline dividers. */
-  border: '#DCDCDA',
+  border: '#D8D4CA',
   text: '#000000',
-  muted: '#707070',
-  inverse: '#FFFFFF',
-  /** Swiss red: primary actions, the active item, highlights. */
-  accent: '#E3000F',
+  /** 5:1 on the paper background. */
+  muted: '#666660',
+  inverse: '#F2F0EB',
+  /** Swiss red: primary actions, the active item, highlights. Darkened from #E3000F to keep 4.5:1 on paper. */
+  accent: '#D6000E',
   onAccent: '#FFFFFF',
-  danger: '#E3000F',
-  backdrop: 'rgba(0,0,0,0.5)',
+  danger: '#D6000E',
+  backdrop: 'rgba(20,19,17,0.5)',
 };
 
 const dark: typeof light = {
-  bg: '#0B0B0B',
-  surface: '#181818',
-  line: '#F2F2F2',
-  border: '#2B2B2B',
-  text: '#F2F2F2',
-  muted: '#9A9A9A',
-  inverse: '#0B0B0B',
+  /** Warm near-black, the same ink as the icon's squares. */
+  bg: '#141311',
+  surface: '#1E1D1A',
+  line: '#F2F0EB',
+  border: '#302E2A',
+  text: '#F2F0EB',
+  muted: '#9A9A94',
+  inverse: '#141311',
   accent: '#FF2B2B',
   onAccent: '#FFFFFF',
   danger: '#FF2B2B',
