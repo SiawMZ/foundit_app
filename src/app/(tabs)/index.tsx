@@ -20,7 +20,7 @@ export default function Links() {
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
   const { width } = useWindowDimensions();
-  const { links, folders, loading, refresh, moveLinks, deleteLinks } = useStore();
+  const { links, folders, loading, refresh, moveLinks, deleteLinks, queued, retryQueued } = useStore();
 
   // Folder and label filters live in the URL so the sidebar, Folders tab and Tags tab can set them.
   const params = useLocalSearchParams<{ folder?: string; label?: string }>();
@@ -97,6 +97,15 @@ export default function Links() {
           )
         }
       />
+
+      {queued.length ? (
+        <View style={[styles.queueBar, { borderColor: c.line }]}>
+          <T variant="small" style={{ flex: 1 }}>
+            {queued.length} {queued.length === 1 ? 'link' : 'links'} saved offline — waiting for a connection.
+          </T>
+          <Button size="sm" variant="secondary" label="Retry" onPress={() => void retryQueued()} />
+        </View>
+      ) : null}
 
       {folderParam || label ? (
         <View style={styles.row}>
@@ -206,6 +215,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { alignSelf: 'center', paddingHorizontal: space.xl },
   headerBlock: { gap: space.lg, paddingBottom: space.xl },
+  queueBar: { flexDirection: 'row', alignItems: 'center', gap: space.md, borderWidth: 2, padding: space.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   divider: { width: 1, height: 20, marginHorizontal: space.xs },
   empty: { paddingVertical: space.xxxl, gap: space.md },

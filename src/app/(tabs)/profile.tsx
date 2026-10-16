@@ -3,6 +3,7 @@ import { Platform, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PLATFORM_NAMES } from '../../../supabase/functions/_shared/url';
+import { ImportPanel } from '@/components/import-panel';
 import { Button, Field, Rule, ScreenHeader, SectionLabel, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { labelCounts } from '@/lib/filter';
@@ -71,7 +72,10 @@ export default function Profile() {
       <T tone="muted">Download every link, folder, label and note as a JSON file — a backup you can keep or move elsewhere.</T>
       <ExportButton />
 
-      <SectionLabel index="04">Delete account</SectionLabel>
+      <SectionLabel index="04">Import</SectionLabel>
+      <ImportPanel />
+
+      <SectionLabel index="05">Delete account</SectionLabel>
       <DeleteAccount />
     </ScrollView>
   );

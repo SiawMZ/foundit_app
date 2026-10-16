@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Field, Rule, T } from '@/components/ui';
 import { emailRedirect, isGoogleEnabled, sendPasswordReset, signInWithGoogle } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { authRedirectError, supabase } from '@/lib/supabase';
 import { fonts, space, useColors } from '@/lib/theme';
 
 type Mode = 'in' | 'up' | 'forgot';
@@ -23,7 +23,10 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState<'email' | 'google' | null>(null);
-  const [message, setMessage] = useState<Message | null>(null);
+  // A failed Google sign-in (or expired email link) comes back with an error in the URL.
+  const [message, setMessage] = useState<Message | null>(() =>
+    authRedirectError ? { text: `Sign-in failed: ${authRedirectError}`, tone: 'danger' } : null,
+  );
   const [google, setGoogle] = useState(false);
 
   useEffect(() => {

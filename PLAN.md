@@ -75,23 +75,27 @@ published yet, so update delivery is still unproven.
 - [x] EAS env vars (preview + production): Supabase URL/key and `EXPO_PUBLIC_WEB_URL`
 - [x] Standalone "preview" APK built 2026-10-16
 - [x] EAS Update configured (channel `preview`, runtime = app version); needs one rebuild to take effect
-- [ ] Install the EAS-Update-enabled preview build and confirm an update arrives
-- [ ] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app, Redirect URLs =
+- [x] Install the EAS-Update-enabled preview build (1.0.1)
+- [ ] Confirm an EAS update arrives on the phone (first publish still pending)
+- [x] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app, Redirect URLs =
       `https://founditapp-red.vercel.app/**` and `linkbox://**` (confirm + reset emails and Google sign-in need these)
 - [x] Login: forgot password (email → `/reset-password`), confirm password on sign-up, Google button (2026-10-16)
-- [x] Google provider enabled in hosted Supabase (seen 2026-10-17) — still to confirm sign-in end to end
-      once the redirect URLs above are set
+- [x] Google sign-in works end to end (2026-10-17; the client secret had to be re-pasted in Supabase)
+
+## Phase 3 (2026-10-17)
+
+- [x] Offline save queue: saves without a connection are kept on the device and retried automatically
+- [x] Import from Instagram / TikTok data downloads (web file picker) or pasted text; post links only
+- [x] Sign-in page shows OAuth / email-link errors from the redirect URL
+- [ ] Quick-save pop-up: owner likes it; decide later (native change, needs a rebuild)
 
 ## Suggested next
 
-- Offline save queue for shares made without internet
 - One-time onboarding showing "Share → Linkbox"
 - Bulk add/remove labels in selection mode
 
 ## Later
 
-- Quick-save overlay (translucent activity) instead of opening the full app
-- Import Instagram / TikTok data exports
 - Dead-link checks, CSV export
 - Design polish: motion, empty-state illustrations, app icon and splash in the Swiss style
 - Publishing: privacy policy, private storage bucket with signed URLs

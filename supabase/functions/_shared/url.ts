@@ -25,7 +25,7 @@ export const PLATFORM_NAMES: Record<Platform, string> = {
 
 const PLATFORM_HOSTS: [Platform, string[]][] = [
   ['instagram', ['instagram.com', 'instagr.am']],
-  ['tiktok', ['tiktok.com']],
+  ['tiktok', ['tiktok.com', 'tiktokv.com']],
   ['xiaohongshu', ['xiaohongshu.com', 'xhslink.com']],
   ['facebook', ['facebook.com', 'fb.com', 'fb.watch']],
   ['youtube', ['youtube.com', 'youtu.be']],

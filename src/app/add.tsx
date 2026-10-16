@@ -26,7 +26,7 @@ export default function Add() {
   const savedShare = useRef<string | null>(null);
 
   // Live version of the saved link, so the preview fills in as enrichment finishes.
-  const saved = result ? (links.find((l) => l.id === result.link.id) ?? result.link) : null;
+  const saved = result?.link ? (links.find((l) => l.id === result.link.id) ?? result.link) : null;
 
   async function save(input: string, folder: string | null) {
     setBusy(true);
@@ -34,7 +34,7 @@ export default function Add() {
     try {
       const r = await saveFromText(input, folder);
       setResult(r);
-      setFolderId(r.link.folder_id);
+      if (r.link) setFolderId(r.link.folder_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save this link.');
     } finally {
@@ -67,7 +67,33 @@ export default function Add() {
       style={{ backgroundColor: c.bg }}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled">
-      {!saved ? (
+      {result?.queued ? (
+        <>
+          <View style={[styles.preview, { borderColor: c.line }]}>
+            <T variant="label" tone="accent">
+              Saved offline
+            </T>
+            <T variant="title" numberOfLines={3}>
+              {text.trim()}
+            </T>
+            <T variant="small" tone="muted">
+              No connection right now. Linkbox keeps it on this device and saves it automatically when you’re back
+              online.
+            </T>
+          </View>
+          <Button label="Done" onPress={done} />
+          {!shared ? (
+            <Button
+              variant="ghost"
+              label="Save another"
+              onPress={() => {
+                setResult(null);
+                setText('');
+              }}
+            />
+          ) : null}
+        </>
+      ) : !saved ? (
         <>
           <SectionLabel index="01">Link</SectionLabel>
           <Field
