@@ -1,5 +1,7 @@
 # Linkbox — plan
 
+"Linkbox" is a working name; the official name is not decided yet.
+
 One place for posts saved across Instagram, Xiaohongshu, TikTok, Facebook and the web.
 Tapping a saved link opens it in the original app.
 
@@ -11,7 +13,7 @@ Tapping a saved link opens it in the original app.
 | Backend | Supabase: Postgres, auth, storage, edge functions. |
 | Share into app | Android `ACTION_SEND` intent filter + a small local Expo module (`modules/share-receiver`). `expo-share-intent` does not support SDK 58 yet. |
 | Enrichment | Edge function `enrich`: resolves short links, fetches preview (oEmbed / Open Graph), copies the thumbnail into storage (platform image URLs expire), asks Claude for a short description + labels. |
-| Labels | AI creates them freely, English, lowercase, 1–4 per link. Stored as `text[]` on the link. User can edit. |
+| Labels | AI creates them freely, English, lowercase, 1–4 per link, reusing existing ones. Stored as `text[]` on the link. User can edit; the field suggests existing labels. |
 | Folders | One link → at most one folder. |
 | Auth | Email + password (single user for now, ready for more later via RLS). |
 | Search/filter/sort | Done on the client over all of the user's links (fast for thousands of rows). |
@@ -21,7 +23,7 @@ Tapping a saved link opens it in the original app.
 ```
 folders  (id, user_id, name, created_at)                      unique(user_id, name)
 links    (id, user_id, url, normalized_url, resolved_url, platform,
-          title, description, author, thumbnail_url, shared_text,
+          title, description, author, thumbnail_path, shared_text,
           note, labels text[], folder_id → folders, pinned,
           status: pending | ready | failed, error,
           created_at, updated_at)                               unique(user_id, normalized_url)
@@ -37,6 +39,11 @@ Row-level security: every row is readable/writable only by its `user_id`.
 2. Client calls `enrich(link_id)`; UI shows a placeholder card until status becomes `ready`/`failed`.
 3. On failure the card still works: platform icon, shared text, editable title.
 
+## Status
+
+Built and verified on web (local Supabase), 2026-10-16. Not yet verified: the Android share sheet
+(needs an EAS build) and AI labels (needs `ANTHROPIC_API_KEY`).
+
 ## MVP (this phase)
 
 - [x] Sign in / sign up
@@ -46,6 +53,10 @@ Row-level security: every row is readable/writable only by its `user_id`.
 - [x] Folders: create / rename / delete, move link
 - [x] Search, filter (platform, folder, label), sort (date, name)
 - [x] Link detail: open in original app, edit title/note/labels/folder, pin, delete
+- [x] Label suggestions while typing
+- [x] Web: details panel closes on click-outside / Escape
+- [ ] Test the Android share flow on the owner's phone (hosted Supabase + EAS build)
+- [ ] Turn on AI labels (set `ANTHROPIC_API_KEY`)
 
 ## Later
 
