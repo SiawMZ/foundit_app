@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Field, Rule, T } from '@/components/ui';
+import { isStrongPassword, PASSWORD_HINT } from '@/lib/auth';
 import { useStore } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
 import { fonts, space, useColors } from '@/lib/theme';
@@ -22,7 +23,7 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false);
 
   const mismatch = confirm.length > 0 && confirm !== password;
-  const canSave = password.length >= 6 && confirm === password && !busy;
+  const canSave = isStrongPassword(password) && confirm === password && !busy;
 
   async function save() {
     if (!canSave) return;
@@ -61,7 +62,7 @@ export default function ResetPassword() {
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="new-password"
-          placeholder="At least 6 characters"
+          placeholder={PASSWORD_HINT}
           autoFocus
         />
         <View style={{ gap: space.sm }}>

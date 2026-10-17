@@ -99,5 +99,6 @@ in Mailpit at http://127.0.0.1:54324.
 
 - Instagram and Facebook often hide previews behind a login. The link still saves and opens; the title falls back to the shared text, and you can edit it.
 - Thumbnails are copied into Supabase Storage because platform image URLs expire.
-- The thumbnails bucket is public with unguessable paths. Switch to a private bucket + signed URLs before publishing.
+- The thumbnails bucket is public with unguessable paths (`{user_id}/{link_id}`), images only, max 5 MB; a thumbnail is deleted with its link.
+- `enrich` limits each user to 200 previews/hour and 60 AI calls/hour, 300/day (secrets `ENRICH_PER_HOUR`, `ENRICH_AI_PER_HOUR`, `ENRICH_AI_PER_DAY`). Every call is logged in the `enrich_log` table.
 - `ENRICH_MODEL` (function secret) changes the model used for labels; default `claude-haiku-5-5` (about $0.10 per 1,000 links).

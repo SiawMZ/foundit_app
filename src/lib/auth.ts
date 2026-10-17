@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
@@ -11,6 +12,13 @@ import { supabase } from '@/lib/supabase';
 export function webBaseUrl(): string | null {
   if (Platform.OS === 'web') return window.location.origin;
   return process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/+$/, '') || null;
+}
+
+/** Matches the Supabase Auth password rules (minimum 8, letters_digits). */
+export const PASSWORD_HINT = 'At least 8 characters, with letters and numbers';
+
+export function isStrongPassword(password: string): boolean {
+  return password.length >= 8 && /[a-z]/i.test(password) && /\d/.test(password);
 }
 
 /** Email links (confirm, reset) open in a browser, so they always point at the web app. */
@@ -54,8 +62,14 @@ export async function signInWithGoogle() {
     return;
   }
 
+  // PKCE: the linkbox:// redirect carries a one-time code instead of the tokens. Another app that
+  // registers the same scheme could receive the redirect, but can't use the code without the
+  // verifier, which stays in this process.
+  const pkce = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL!, process.env.EXPO_PUBLIC_SUPABASE_KEY!, {
+    auth: { flowType: 'pkce', persistSession: false, autoRefreshToken: false, storageKey: 'linkbox-pkce' },
+  });
   const redirectTo = Linking.createURL('/');
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await pkce.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: true },
   });
@@ -66,18 +80,15 @@ export async function signInWithGoogle() {
 
   const params = authParams(result.url);
   if (params.error_description || params.error) throw new Error(params.error_description ?? params.error);
-  if (params.code) {
-    const { error: e } = await supabase.auth.exchangeCodeForSession(params.code);
-    if (e) throw e;
-  } else if (params.access_token && params.refresh_token) {
-    const { error: e } = await supabase.auth.setSession({
-      access_token: params.access_token,
-      refresh_token: params.refresh_token,
-    });
-    if (e) throw e;
-  } else {
-    throw new Error('Google sign-in did not return a session.');
-  }
+  if (!params.code) throw new Error('Google sign-in did not return a session.');
+  const { data: exchanged, error: e } = await pkce.auth.exchangeCodeForSession(params.code);
+  if (e) throw e;
+  // Hand the session to the app's client, which stores and refreshes it.
+  const { error: setError } = await supabase.auth.setSession({
+    access_token: exchanged.session.access_token,
+    refresh_token: exchanged.session.refresh_token,
+  });
+  if (setError) throw setError;
 }
 
 /** Auth results arrive in the query (?code=) or the fragment (#access_token=). */

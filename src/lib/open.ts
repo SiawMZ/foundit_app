@@ -1,5 +1,6 @@
 import { Linking, Platform } from 'react-native';
 
+import { isWebUrl } from '../../supabase/functions/_shared/url';
 import { supabase } from './supabase';
 
 /**
@@ -7,7 +8,8 @@ import { supabase } from './supabase';
  * are claimed by the installed app (App Links), so this lands in the right app.
  */
 export async function openLink(link: { url: string; resolved_url?: string | null }) {
-  const url = link.resolved_url ?? link.url;
+  const url = [link.resolved_url, link.url].find((u): u is string => !!u && isWebUrl(u));
+  if (!url) return;
   if (Platform.OS === 'web') {
     window.open(url, '_blank', 'noopener,noreferrer');
     return;

@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Field, Rule, T } from '@/components/ui';
-import { emailRedirect, isGoogleEnabled, sendPasswordReset, signInWithGoogle } from '@/lib/auth';
+import { emailRedirect, isGoogleEnabled, isStrongPassword, PASSWORD_HINT, sendPasswordReset, signInWithGoogle } from '@/lib/auth';
 import { authRedirectError, supabase } from '@/lib/supabase';
 import { fonts, space, useColors } from '@/lib/theme';
 
@@ -40,7 +40,7 @@ export default function SignIn() {
   const mismatch = mode === 'up' && confirm.length > 0 && confirm !== password;
   const canSubmit =
     !!email.trim() &&
-    (mode === 'forgot' || password.length >= 6) &&
+    (mode === 'forgot' || (mode === 'up' ? isStrongPassword(password) : password.length > 0)) &&
     (mode !== 'up' || (confirm === password && !mismatch));
 
   function switchTo(next: Mode) {
@@ -144,7 +144,7 @@ export default function SignIn() {
                 onChangeText={setPassword}
                 secureTextEntry
                 autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-                placeholder={mode === 'up' ? 'At least 6 characters' : undefined}
+                placeholder={mode === 'up' ? PASSWORD_HINT : undefined}
                 onSubmitEditing={mode === 'in' ? submit : undefined}
               />
             ) : null}

@@ -86,6 +86,17 @@ function createLimiter(max: number) {
     });
 }
 
+/**
+ * Thumbnails are public by URL, so they go when their link goes. Best effort: a leftover file is
+ * harmless and is removed with the account.
+ */
+async function removeThumbnails(rows: { thumbnail_path: string | null }[] | null) {
+  const paths = (rows ?? []).map((r) => r.thumbnail_path).filter((p): p is string => !!p);
+  if (!paths.length) return;
+  const { error } = await supabase.storage.from('thumbnails').remove(paths);
+  if (error) console.warn('thumbnail cleanup failed', error.message);
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -318,9 +329,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteLink = useCallback(async (id: string) => {
-    const { error } = await supabase.from('links').delete().eq('id', id);
+    const { data, error } = await supabase.from('links').delete().eq('id', id).select('thumbnail_path');
     if (error) throw error;
     setLinks((prev) => prev.filter((l) => l.id !== id));
+    void removeThumbnails(data);
   }, []);
 
   const moveLinks = useCallback(async (ids: string[], folderId: string | null) => {
@@ -333,10 +345,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteLinks = useCallback(async (ids: string[]) => {
     if (!ids.length) return;
-    const { error } = await supabase.from('links').delete().in('id', ids);
+    const { data, error } = await supabase.from('links').delete().in('id', ids).select('thumbnail_path');
     if (error) throw error;
     const set = new Set(ids);
     setLinks((prev) => prev.filter((l) => !set.has(l.id)));
+    void removeThumbnails(data);
   }, []);
 
   const shareFolder = useCallback(async (id: string) => {

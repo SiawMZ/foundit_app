@@ -76,7 +76,7 @@ published yet, so update delivery is still unproven.
 - [x] Standalone "preview" APK built 2026-10-16
 - [x] EAS Update configured (channel `preview`, runtime = app version); needs one rebuild to take effect
 - [x] Install the EAS-Update-enabled preview build (1.0.1)
-- [ ] Confirm an EAS update arrives on the phone (first publish still pending)
+- [x] EAS update delivery confirmed on the phone (2026-10-17: offline saving + import)
 - [x] Supabase Auth → URL Configuration: Site URL = https://founditapp-red.vercel.app, Redirect URLs =
       `https://founditapp-red.vercel.app/**` and `linkbox://**` (confirm + reset emails and Google sign-in need these)
 - [x] Login: forgot password (email → `/reset-password`), confirm password on sign-up, Google button (2026-10-16)
@@ -98,16 +98,44 @@ published yet, so update delivery is still unproven.
 
 - Dead-link checks, CSV export
 - Design polish: motion, empty-state illustrations, app icon and splash in the Swiss style
-- Publishing: privacy policy, private storage bucket with signed URLs
+- Publishing: privacy policy (thumbnails stay in a public bucket: paths are two UUIDs, and files are
+  deleted with their link)
+
+## Security (review 2026-10-17)
+
+Done in code. Goes live with `npx supabase db push`, `npx supabase functions deploy enrich` and
+`npx supabase functions deploy delete-account`, then a Vercel deploy (push) and an EAS update for the app parts.
+
+- [x] Saved links must be http(s) (DB check + `openLink` guard): a `javascript:` link on a shared page
+      could run in a viewer's signed-in session
+- [x] `enrich` fetches safely: http(s) on ports 80/443 only; private, loopback and link-local addresses
+      blocked (after DNS and on every redirect); max 5 redirects; size-limited reads for pages and images
+- [x] `enrich_log` table records every enrich call per user (audit log, service role only). Limits per user:
+      200 previews/hour, 60 AI calls/hour, 300 AI calls/day (function secrets `ENRICH_PER_HOUR`,
+      `ENRICH_AI_PER_HOUR`, `ENRICH_AI_PER_DAY`). Over the AI limit a link still gets its preview, without AI labels
+- [x] AI prompt input capped and page text marked as untrusted; functions return plain error messages
+- [x] Thumbnails: jpeg/png/webp/gif only, max 5 MB (bucket limits too), removed when their link is deleted
+- [x] Size limits on link fields; a link can only go into its owner's folder; shared pages list only the owner's links
+- [x] Phone Google sign-in uses PKCE (the `linkbox://` redirect carries a one-time code, not tokens)
+- [x] Passwords: at least 8 characters with letters and numbers (app + local config)
+
+Owner, in dashboards:
+
+- [ ] Supabase → Authentication → Providers → Email: minimum password length 8, requirements "letters and digits"
+- [ ] Custom SMTP (e.g. Resend free tier): the built-in email service only sends to the project's team
+      members, a few per hour, so other people would not get confirmation emails
+- [ ] Anthropic console: monthly spend limit for the API key
+- [ ] Delete orphaned thumbnails from links deleted before this change (Storage → thumbnails)
 
 ## Fix before deploying / publishing
 
-- **Server fetches any URL a user saves** (`enrich`): block private/loopback addresses and non-http(s)
-  schemes before fetching (SSRF), and cap redirects.
-- **No rate limit on `enrich`**: each call can spend Anthropic credit; limit calls per user per hour.
-- **Free Supabase projects pause after ~7 days without activity**; upgrade or keep it active once others rely on it.
-- **No error reporting** from the phone app or functions (e.g. Sentry / EAS Observe); needed before strangers use it.
+- **No error reporting** from the phone app or functions (e.g. Sentry free tier / EAS Observe); decide which,
+  it needs a rebuild. Until then the `enrich_log` table and Supabase function logs are the only trail.
+- **Free Supabase projects pause after ~7 days without activity**, and the free plan has no backups you
+  can restore yourself: upgrade, or schedule `npx supabase db dump` and keep the project active.
 - **Final name, icon and Android package** must be settled before the first Play Store upload (the package is permanent).
+- Nice-to-have: security headers on Vercel (CSP, frame-ancestors), show only known sign-in error
+  messages, clear the offline queue on sign-out.
 
 - **Email confirmation lands on a broken page.** The confirmation link confirms the account, then
   redirects to the Supabase **Site URL**, which still has the default `http://localhost:3000`, so users

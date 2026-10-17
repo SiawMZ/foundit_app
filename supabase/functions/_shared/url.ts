@@ -50,6 +50,19 @@ export function extractUrl(text: string): string | null {
   return match[0].replace(/[.,;:!?]+$/, '');
 }
 
+/**
+ * Only plain web links are ever opened or fetched. Saved rows can be written straight through the
+ * API, so a `javascript:`, `intent:` or `file:` URL must never reach window.open / Linking / fetch.
+ */
+export function isWebUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 export function detectPlatform(url: string): Platform {
   let host: string;
   try {

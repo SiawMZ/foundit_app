@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error('delete-account failed', userId, message);
-    return json({ error: message }, 500);
+    // Nothing is lost on a partial failure: thumbnails can be fetched again and the account remains.
+    return json({ error: 'Could not delete the account. Please try again.' }, 500);
   }
 });
 

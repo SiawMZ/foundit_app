@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PLATFORM_NAMES } from '../../../supabase/functions/_shared/url';
 import { ImportPanel } from '@/components/import-panel';
 import { Button, Field, Rule, ScreenHeader, SectionLabel, T } from '@/components/ui';
+import { isStrongPassword, PASSWORD_HINT } from '@/lib/auth';
 import { confirm } from '@/lib/confirm';
 import { labelCounts } from '@/lib/filter';
 import { useStore } from '@/lib/store';
@@ -114,10 +115,10 @@ function ChangePassword() {
             onChangeText={setPassword}
             secureTextEntry
             autoComplete="new-password"
-            placeholder="At least 6 characters"
+            placeholder={PASSWORD_HINT}
           />
         </View>
-        <Button label="Change" variant="secondary" loading={busy} disabled={password.length < 6} onPress={save} />
+        <Button label="Change" variant="secondary" loading={busy} disabled={!isStrongPassword(password)} onPress={save} />
       </View>
       {note ? <T variant="small" tone="muted">{note}</T> : null}
     </View>
