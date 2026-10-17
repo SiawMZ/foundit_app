@@ -48,15 +48,18 @@ export async function sendPasswordReset(email: string) {
   if (error) throw error;
 }
 
+/** Always show Google's account chooser, so a different Google account can be picked. */
+const GOOGLE_PARAMS = { prompt: 'select_account' };
+
 /**
  * Web: full-page redirect to Google; supabase-js picks the session up from the URL on return.
- * Phone: opens Google in a browser tab that hands the tokens back through the linkbox:// scheme.
+ * Phone: opens Google in a browser tab that hands a one-time code back through the linkbox:// scheme.
  */
 export async function signInWithGoogle() {
   if (Platform.OS === 'web') {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: window.location.origin, queryParams: GOOGLE_PARAMS },
     });
     if (error) throw error;
     return;
@@ -71,7 +74,7 @@ export async function signInWithGoogle() {
   const redirectTo = Linking.createURL('/');
   const { data, error } = await pkce.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo, skipBrowserRedirect: true },
+    options: { redirectTo, skipBrowserRedirect: true, queryParams: GOOGLE_PARAMS },
   });
   if (error) throw error;
 

@@ -121,10 +121,10 @@ Done in code. Goes live with `npx supabase db push`, `npx supabase functions dep
 
 Owner, in dashboards:
 
-- [ ] Supabase → Authentication → Providers → Email: minimum password length 8, requirements "letters and digits"
+- [x] Supabase → Authentication → Providers → Email: minimum password length 8, requirements "letters and digits" (2026-10-17)
 - [ ] Custom SMTP (e.g. Resend free tier): the built-in email service only sends to the project's team
       members, a few per hour, so other people would not get confirmation emails
-- [ ] Anthropic console: monthly spend limit for the API key
+- [x] Anthropic console: monthly spend limit for the API key (2026-10-17)
 - [ ] Delete orphaned thumbnails from links deleted before this change (Storage → thumbnails)
 
 ## Fix before deploying / publishing
