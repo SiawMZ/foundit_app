@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PLATFORM_NAMES, type Platform } from '../../../supabase/functions/_shared/url';
@@ -8,7 +8,8 @@ import { FolderPicker } from '@/components/folder-picker';
 import { LinkCard } from '@/components/link-card';
 import { Button, Chip, Field, Rule, ScreenHeader, Sheet, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
-import { applyFilter, SORT_LABELS, type SortKey } from '@/lib/filter';
+import { askSearch } from '@/lib/ask';
+import { applyFilter, rankByTerms, SORT_LABELS, type AskTerms, type SortKey } from '@/lib/filter';
 import { useStore } from '@/lib/store';
 import { pad2, space, useColors, useIsWide } from '@/lib/theme';
 
@@ -33,6 +34,11 @@ export default function Links() {
   const [sort, setSort] = useState<SortKey>('newest');
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [moving, setMoving] = useState(false);
+  // AI search: runs only when the question is submitted, never per keystroke.
+  const [ai, setAi] = useState(false);
+  const [asked, setAsked] = useState<AskTerms | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
   const selecting = selected !== null;
   const list = useRef<FlatList>(null);
 
@@ -44,10 +50,12 @@ export default function Links() {
   const contentWidth = Math.min(width - (wide ? 260 : 0), MAX_WIDTH);
   const columns = Math.max(2, Math.floor((contentWidth - space.xl * 2) / 230));
 
-  const visible = useMemo(
-    () => applyFilter(links, { query, platform, folder, label, sort }),
-    [links, query, platform, folder, label, sort],
-  );
+  const visible = useMemo(() => {
+    if (!ai) return applyFilter(links, { query, platform, folder, label, sort });
+    // In AI mode the typed question is not a filter; only the returned terms are.
+    const base = applyFilter(links, { query: '', platform, folder, label, sort });
+    return asked ? rankByTerms(base, asked) : base;
+  }, [links, query, platform, folder, label, sort, ai, asked]);
   const platforms = useMemo(() => [...new Set(links.map((l) => l.platform))].sort() as Platform[], [links]);
   const folderNames = useMemo(() => new Map(folders.map((f) => [f.id, f.name])), [folders]);
 
@@ -62,6 +70,37 @@ export default function Links() {
     });
   }, []);
   const startSelect = useCallback((id: string) => setSelected(new Set([id])), []);
+
+  function toggleAi() {
+    setAi(!ai);
+    setAsked(null);
+    setAskError(null);
+  }
+
+  function changeQuery(text: string) {
+    setQuery(text);
+    if (!text.trim()) {
+      setAsked(null);
+      setAskError(null);
+    }
+  }
+
+  async function ask() {
+    const question = query.trim();
+    if (!ai || asking || question.length < 3) return;
+    setAsking(true);
+    setAskError(null);
+    try {
+      setAsked(await askSearch(question));
+    } catch (e) {
+      setAsked(null);
+      setAskError(e instanceof Error ? e.message : 'AI search failed. Try again.');
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  const askedTerms = asked ? [...asked.keywords, ...asked.labels.map((l) => `#${l}`)] : [];
 
   async function removeSelected() {
     const ids = [...(selected ?? [])];
@@ -118,12 +157,45 @@ export default function Links() {
       ) : null}
 
       <Field
-        placeholder="Search titles, notes, labels…"
+        placeholder={ai ? 'Ask, e.g. that matcha cafe in KK' : 'Search titles, notes, labels…'}
         value={query}
-        onChangeText={setQuery}
+        onChangeText={changeQuery}
+        onSubmitEditing={() => void ask()}
+        returnKeyType={ai ? 'search' : 'done'}
+        maxLength={ai ? 200 : undefined}
         autoCapitalize="none"
         clearButtonMode="while-editing"
+        accessibilityLabel={ai ? 'Ask AI to find saved posts' : 'Search links'}
+        right={
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel="AI search"
+            accessibilityState={{ checked: ai }}
+            onPress={toggleAi}
+            hitSlop={8}
+            style={({ pressed }) => [styles.aiToggle, { opacity: pressed ? 0.6 : 1 }]}>
+            {asking ? (
+              <ActivityIndicator size="small" color={c.accent} />
+            ) : (
+              <T variant="label" tone={ai ? 'accent' : 'muted'}>
+                AI
+              </T>
+            )}
+          </Pressable>
+        }
       />
+      {ai ? (
+        <T variant="small" tone={askError ? 'danger' : 'muted'}>
+          {askError ??
+            (asking
+              ? 'Finding search terms…'
+              : asked
+                ? askedTerms.length
+                  ? `Searched for: ${askedTerms.join(' · ')}`
+                  : 'That didn’t look like a search. Describe the post you’re looking for.'
+                : 'Describe a post in your own words and press Enter. AI picks the search terms; only your links are searched.')}
+        </T>
+      ) : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         <Chip label={`Sort: ${SORT_LABELS[sort]}`} onPress={() => setSort(SORTS[(SORTS.indexOf(sort) + 1) % SORTS.length])} />
         <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -217,6 +289,7 @@ const styles = StyleSheet.create({
   headerBlock: { gap: space.lg, paddingBottom: space.xl },
   queueBar: { flexDirection: 'row', alignItems: 'center', gap: space.md, borderWidth: 2, padding: space.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
+  aiToggle: { height: 32, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   divider: { width: 1, height: 20, marginHorizontal: space.xs },
   empty: { paddingVertical: space.xxxl, gap: space.md },
   bulkBar: {

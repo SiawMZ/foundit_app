@@ -89,10 +89,27 @@ published yet, so update delivery is still unproven.
 - [x] Sign-in page shows OAuth / email-link errors from the redirect URL
 - [ ] Quick-save pop-up: owner likes it; decide later (native change, needs a rebuild)
 
+## Phase 4 (2026-10-19)
+
+- [x] Installable website (PWA): `public/manifest.json`, icons in `public/icons/` (from `assets/images/icon.png`,
+      already maskable-safe), head tags in `public/index.html` (Expo's template for `web.output: "single"`).
+      No service worker. Goes live with a Vercel deploy (push); no phone update.
+- [x] "Ask AI" search: an AI chip next to the search field. Claude (Haiku 5.5) turns the question into search terms
+      only (`ask` edge function, structured output: keywords, labels from the user's own list, platform); the app
+      searches the links locally (`rankByTerms` in `src/lib/filter.ts`). Claude never sees saved links or picks results,
+      so prompt injection can at most produce bad keywords; nothing found → empty list.
+      Limits: question 3–200 chars, runs on submit only, per user 20/hour + 100/day, app-wide 1000/day
+      (secrets `ASK_PER_HOUR`, `ASK_PER_DAY`, `ASK_GLOBAL_PER_DAY`), logged in `ask_log` (no question text stored).
+- [ ] Go live: `npx supabase db push` (ask_log), `npx supabase functions deploy ask`, push to `main` (Vercel),
+      `npm run update:phone -- "..."` (JS only, no rebuild)
+
 ## Suggested next
 
-- One-time onboarding showing "Share → Linkbox"
+- "Update ready — Restart" bar once an EAS update has downloaded (JS only)
 - Bulk add/remove labels in selection mode
+- Refresh all missing previews (one button, reuses `enrich`)
+- Keep the original saved date on imported posts (Instagram/TikTok exports include it)
+- One-time onboarding showing "Share → Linkbox" (the Links empty state already says it)
 
 ## Later
 

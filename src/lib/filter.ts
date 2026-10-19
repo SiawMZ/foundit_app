@@ -59,6 +59,37 @@ export function applyFilter(links: Link[], f: LinkFilter): Link[] {
   return out.sort((a, b) => Number(b.pinned) - Number(a.pinned) || compare[f.sort](a, b));
 }
 
+/** Search terms from the `ask` function (AI search). */
+export type AskTerms = { keywords: string[]; labels: string[]; platform: Platform | null };
+
+/**
+ * AI search: links that match any keyword or carry any of the labels, most hits first.
+ * Nothing matches → []. `base` is already narrowed by the folder/label filters.
+ */
+export function rankByTerms(base: Link[], terms: AskTerms): Link[] {
+  const keywords = terms.keywords.map((k) => k.toLowerCase());
+  const scored: { link: Link; score: number }[] = [];
+  for (const l of base) {
+    if (terms.platform && l.platform !== terms.platform) continue;
+    const hay = [l.title, l.description, l.note, l.author, l.shared_text, l.url, ...l.labels]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    // A matching label counts double: it's the user's own organization.
+    const score =
+      keywords.filter((k) => hay.includes(k)).length + 2 * terms.labels.filter((t) => l.labels.includes(t)).length;
+    if (score > 0) scored.push({ link: l, score });
+  }
+  return scored
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        Number(b.link.pinned) - Number(a.link.pinned) ||
+        b.link.created_at.localeCompare(a.link.created_at),
+    )
+    .map((s) => s.link);
+}
+
 /** Labels ordered by how often they're used. */
 export function labelCounts(links: Link[]): [string, number][] {
   const counts = new Map<string, number>();

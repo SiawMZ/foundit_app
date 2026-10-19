@@ -105,23 +105,35 @@ function buttonLook(c: Colors, variant: 'primary' | 'secondary' | 'ghost' | 'dan
   }
 }
 
-export function Field(props: TextInputProps & { label?: string }) {
+export function Field(props: TextInputProps & { label?: string; right?: ReactNode }) {
   const c = useColors();
-  const { label, style, ...rest } = props;
+  const { label, style, right, ...rest } = props;
+  const input = (
+    <TextInput
+      placeholderTextColor={c.muted}
+      {...rest}
+      style={[
+        styles.input,
+        type.body,
+        { color: c.text, borderColor: c.line, backgroundColor: c.bg },
+        rest.multiline && { minHeight: 96, textAlignVertical: 'top', paddingTop: space.md },
+        // With a control inside the box, the border moves to the wrapper.
+        right ? { flex: 1, borderWidth: 0 } : null,
+        style,
+      ]}
+    />
+  );
   return (
     <View style={{ gap: space.sm }}>
       {label ? <T variant="label" tone="muted">{label}</T> : null}
-      <TextInput
-        placeholderTextColor={c.muted}
-        {...rest}
-        style={[
-          styles.input,
-          type.body,
-          { color: c.text, borderColor: c.line, backgroundColor: c.bg },
-          rest.multiline && { minHeight: 96, textAlignVertical: 'top', paddingTop: space.md },
-          style,
-        ]}
-      />
+      {right ? (
+        <View style={[styles.inputRow, { borderColor: c.line, backgroundColor: c.bg }]}>
+          {input}
+          {right}
+        </View>
+      ) : (
+        input
+      )}
     </View>
   );
 }
@@ -276,6 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonSm: { minHeight: 34, paddingHorizontal: space.md },
+  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, paddingRight: space.sm },
   input: {
     minHeight: 46,
     borderWidth: 2,
