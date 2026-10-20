@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button, Rule, T } from '@/components/ui';
 import { useStore } from '@/lib/store';
-import { fonts, pad2, space, useColors } from '@/lib/theme';
+import { fonts, space, useColors } from '@/lib/theme';
 
 const LABELS: Record<string, string> = {
   index: 'Links',
@@ -29,12 +29,10 @@ function BottomBar({ state, navigateToTab, insets }: BottomTabBarProps) {
             key={route.key}
             onPress={() => navigateToTab(route.key)}
             accessibilityRole="tab"
+            accessibilityLabel={LABELS[route.name] ?? route.name}
             accessibilityState={{ selected: active }}
             style={styles.bottomItem}>
             <View style={[styles.bottomMarker, { backgroundColor: active ? c.accent : 'transparent' }]} />
-            <T variant="number" tone={active ? 'accent' : 'muted'}>
-              {pad2(i + 1)}
-            </T>
             <T variant="label" tone={active ? 'text' : 'muted'}>
               {LABELS[route.name] ?? route.name}
             </T>
@@ -66,7 +64,6 @@ function Sidebar({ state, navigateToTab, insets }: BottomTabBarProps) {
           return (
             <View key={route.key}>
               <SideItem
-                index={pad2(i + 1)}
                 label={LABELS[route.name] ?? route.name}
                 count={route.name === 'index' ? links.length : route.name === 'folders' ? folders.length : undefined}
                 active={active}
@@ -103,14 +100,12 @@ function Sidebar({ state, navigateToTab, insets }: BottomTabBarProps) {
 }
 
 function SideItem({
-  index,
   label,
   count,
   active,
   small,
   onPress,
 }: {
-  index?: string;
   label: string;
   count?: number;
   active?: boolean;
@@ -128,11 +123,6 @@ function SideItem({
         small && styles.sideItemSmall,
         { backgroundColor: hovered && !active ? c.surface : 'transparent', borderLeftColor: active ? c.accent : 'transparent' },
       ]}>
-      {index ? (
-        <T variant="number" tone={active ? 'accent' : 'muted'} style={{ width: 22 }}>
-          {index}
-        </T>
-      ) : null}
       <T
         variant={small ? 'small' : 'heading'}
         tone={active ? 'accent' : 'text'}
@@ -151,8 +141,9 @@ function SideItem({
 
 const styles = StyleSheet.create({
   bottom: { flexDirection: 'row', borderTopWidth: 2 },
-  bottomItem: { flex: 1, alignItems: 'flex-start', paddingHorizontal: space.md, paddingTop: 0, paddingBottom: space.md, gap: 2 },
-  bottomMarker: { height: 3, alignSelf: 'stretch', marginBottom: space.sm },
+  // Marker + label + padding keeps each tab at least 48px tall.
+  bottomItem: { flex: 1, alignItems: 'flex-start', paddingHorizontal: space.md, paddingBottom: space.lg },
+  bottomMarker: { height: 3, alignSelf: 'stretch', marginBottom: space.lg },
   side: { width: 260, borderRightWidth: 2, paddingHorizontal: space.xl, paddingBottom: space.md },
   brand: { fontFamily: fonts.black, fontSize: 28, letterSpacing: -1, lineHeight: 30 },
   sideItem: {
