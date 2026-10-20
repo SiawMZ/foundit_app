@@ -1,30 +1,34 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Field, Rule, ScreenHeader, Sheet, T } from '@/components/ui';
+import { Button, Field, Rule, ScreenHeader, SectionLabel, Sheet, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
-import { folderShareUrl, shareUrl } from '@/lib/share-link';
+import { folderInviteUrl, folderShareUrl, shareUrl } from '@/lib/share-link';
 import { useStore } from '@/lib/store';
 import { pad2, space, useColors } from '@/lib/theme';
-import type { Folder } from '@/lib/types';
+import type { Folder, FolderMember } from '@/lib/types';
 
 const MAX_WIDTH = 760;
 
 export default function Folders() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { folders, links, createFolder, renameFolder, deleteFolder } = useStore();
+  const { session, folders, links, joinedLinks, createFolder, renameFolder, deleteFolder } = useStore();
   const [name, setName] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [sharing, setSharing] = useState<Folder | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const me = session?.user.id;
+  const own = folders.filter((f) => f.user_id === me);
+  const joined = folders.filter((f) => f.user_id !== me);
 
   const counts = new Map<string, number>();
   let unfiled = 0;
-  for (const l of links) {
+  for (const l of [...links, ...joinedLinks]) {
     if (l.folder_id) counts.set(l.folder_id, (counts.get(l.folder_id) ?? 0) + 1);
     else unfiled++;
   }
@@ -49,17 +53,22 @@ export default function Folders() {
     const n = counts.get(f.id) ?? 0;
     const ok = await confirm(
       `Delete “${f.name}”?`,
-      n ? `Its ${n} link${n === 1 ? '' : 's'} stay in Linkbox, unfiled.` : 'The folder is empty.',
+      f.role
+        ? 'Everyone loses access. Each person’s links go back to their own library, unfiled.'
+        : n
+          ? `Its ${n} link${n === 1 ? '' : 's'} stay in Linkbox, unfiled.`
+          : 'The folder is empty.',
     );
     if (ok) await run(() => deleteFolder(f.id));
   }
 
   const open = (folder: string) => router.navigate({ pathname: '/', params: { folder, label: '' } });
+  const sharingFolder = folders.find((f) => f.id === sharing) ?? null;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <FlatList
-        data={folders}
+        data={own}
         keyExtractor={(f) => f.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.container, { paddingTop: insets.top + space.xl }]}
@@ -104,11 +113,19 @@ export default function Folders() {
               index={pad2(index + 1)}
               name={item.name}
               count={counts.get(item.id) ?? 0}
-              shared={!!item.share_token}
+              detail={[
+                item.member_count ? `${item.member_count} people` : '',
+                item.share_token ? 'Public link on' : '',
+              ]}
               onPress={() => open(item.id)}
               actions={
                 <>
-                  <Button size="sm" variant="secondary" label={item.share_token ? 'Shared' : 'Share'} onPress={() => setSharing(item)} />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    label={item.member_count || item.share_token || item.invite_token ? 'Shared' : 'Share'}
+                    onPress={() => setSharing(item.id)}
+                  />
                   <Button
                     size="sm"
                     variant="ghost"
@@ -124,8 +141,30 @@ export default function Folders() {
             />
           )
         }
+        ListFooterComponent={
+          joined.length ? (
+            <View style={{ gap: space.sm, paddingTop: space.xl }}>
+              <SectionLabel>Joined</SectionLabel>
+              {joined.map((f, i) => (
+                <Row
+                  key={f.id}
+                  index={pad2(i + 1)}
+                  name={f.name}
+                  count={counts.get(f.id) ?? 0}
+                  detail={[`by ${f.owner_name ?? 'someone'}`, f.member_count ? `${f.member_count} people` : '']}
+                  onPress={() => open(f.id)}
+                  actions={<Button size="sm" variant="secondary" label="Members" onPress={() => setSharing(f.id)} />}
+                />
+              ))}
+            </View>
+          ) : undefined
+        }
       />
-      <ShareSheet folder={sharing ? (folders.find((f) => f.id === sharing.id) ?? null) : null} onClose={() => setSharing(null)} />
+      {sharingFolder?.user_id === me ? (
+        <ShareSheet folder={sharingFolder} onClose={() => setSharing(null)} />
+      ) : (
+        <JoinedSheet folder={sharingFolder} onClose={() => setSharing(null)} />
+      )}
     </View>
   );
 }
@@ -134,14 +173,14 @@ function Row({
   index,
   name,
   count,
-  shared,
+  detail = [],
   onPress,
   actions,
 }: {
   index: string;
   name: string;
   count: number;
-  shared?: boolean;
+  detail?: string[];
   onPress: () => void;
   actions?: React.ReactNode;
 }) {
@@ -164,8 +203,7 @@ function Row({
               {name}
             </T>
             <T variant="label" tone="muted">
-              {count} {count === 1 ? 'link' : 'links'}
-              {shared ? '  ·  Public link on' : ''}
+              {[`${count} ${count === 1 ? 'link' : 'links'}`, ...detail].filter(Boolean).join('  ·  ')}
             </T>
           </View>
         </Pressable>
@@ -176,22 +214,35 @@ function Row({
   );
 }
 
-function ShareSheet({ folder, onClose }: { folder: Folder | null; onClose: () => void }) {
-  const { shareFolder, unshareFolder } = useStore();
+/** Runs an action with a busy flag and shows the result or error under it. */
+function useAction() {
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const url = folder?.share_token ? folderShareUrl(folder.share_token) : null;
-
-  async function act(fn: () => Promise<unknown>) {
+  const [note, setNote] = useState<{ text: string; tone: 'muted' | 'danger' } | null>(null);
+  async function act(fn: () => Promise<string | void>) {
     setBusy(true);
     setNote(null);
     try {
-      await fn();
+      const done = await fn();
+      if (done) setNote({ text: done, tone: 'muted' });
     } catch (e) {
-      setNote(e instanceof Error ? e.message : 'Something went wrong');
+      setNote({ text: e instanceof Error ? e.message : 'Something went wrong', tone: 'danger' });
     } finally {
       setBusy(false);
     }
+  }
+  return { busy, note, setNote, act };
+}
+
+/** Owner: invite people to add links, see members, and the public read-only link. */
+function ShareSheet({ folder, onClose }: { folder: Folder | null; onClose: () => void }) {
+  const { shareFolder, unshareFolder, createInvite, revokeInvite } = useStore();
+  const { busy, note, setNote, act } = useAction();
+  const publicUrl = folder?.share_token ? folderShareUrl(folder.share_token) : null;
+  const inviteUrl = folder?.invite_token ? folderInviteUrl(folder.invite_token) : null;
+
+  async function copy(url: string, title: string) {
+    const r = await shareUrl(url, title);
+    return r === 'copied' ? 'Copied to clipboard.' : undefined;
   }
 
   return (
@@ -202,45 +253,159 @@ function ShareSheet({ folder, onClose }: { folder: Folder | null; onClose: () =>
         onClose();
       }}
       title={folder ? `Share “${folder.name}”` : 'Share'}>
-      {!folder?.share_token ? (
+      {folder ? (
+        <>
+          <SectionLabel index="01">Invite people</SectionLabel>
+          <T tone="muted">
+            People with the invite link can sign in, join and add their own links. Everyone sees the folder’s posts; notes
+            stay private.
+          </T>
+          {inviteUrl ? (
+            <>
+              <T selectable>{inviteUrl}</T>
+              <View style={styles.buttons}>
+                <Button label="Copy / share invite" onPress={() => act(() => copy(inviteUrl, `Join “${folder.name}”`))} />
+                <Button variant="danger" label="Turn off invite" loading={busy} onPress={() => act(() => revokeInvite(folder.id))} />
+              </View>
+            </>
+          ) : (
+            <Button
+              label={folder.invite_token ? 'Invite link on' : 'Create invite link'}
+              loading={busy}
+              onPress={() => act(async () => void (await createInvite(folder.id)))}
+            />
+          )}
+          {folder.invite_token && !inviteUrl ? (
+            <T tone="muted">Set EXPO_PUBLIC_WEB_URL so the app knows the website address for invite links.</T>
+          ) : null}
+          {folder.role ? <Members folder={folder} canRemove /> : null}
+
+          <SectionLabel index="02">Public read-only link</SectionLabel>
+          {!folder.share_token ? (
+            <>
+              <T tone="muted">
+                Anyone with the link can see this folder’s posts — titles, previews and descriptions — without signing in.
+                Notes stay private. You can turn the link off at any time.
+              </T>
+              <Button
+                variant="secondary"
+                label="Create public link"
+                loading={busy}
+                onPress={() => act(async () => void (await shareFolder(folder.id)))}
+              />
+            </>
+          ) : (
+            <>
+              {publicUrl ? <T selectable>{publicUrl}</T> : null}
+              <View style={styles.buttons}>
+                {publicUrl ? (
+                  <Button variant="secondary" label="Copy / share link" onPress={() => act(() => copy(publicUrl, folder.name))} />
+                ) : null}
+                <Button variant="danger" label="Turn off link" loading={busy} onPress={() => act(() => unshareFolder(folder.id))} />
+              </View>
+            </>
+          )}
+        </>
+      ) : null}
+      {note ? <T variant="small" tone={note.tone}>{note.text}</T> : null}
+    </Sheet>
+  );
+}
+
+/** Member of someone else's folder: who's in it, and leave. */
+function JoinedSheet({ folder, onClose }: { folder: Folder | null; onClose: () => void }) {
+  const { leaveFolder } = useStore();
+  const { busy, note, setNote, act } = useAction();
+
+  async function leave() {
+    if (!folder) return;
+    const ok = await confirm(
+      `Leave “${folder.name}”?`,
+      'You keep a copy of every post as a normal folder of your own. Links you added stay in this folder for the others.',
+      'Leave',
+    );
+    if (!ok) return;
+    await act(async () => {
+      const r = await leaveFolder(folder.id);
+      onClose();
+      router.navigate({ pathname: '/', params: { folder: r.folder_id, label: '' } });
+    });
+  }
+
+  return (
+    <Sheet
+      visible={!!folder}
+      onClose={() => {
+        setNote(null);
+        onClose();
+      }}
+      title={folder ? `“${folder.name}”` : 'Folder'}>
+      {folder ? (
         <>
           <T tone="muted">
-            Anyone with the link can see this folder’s posts — titles, previews and descriptions — without signing in. Your
-            notes stay private. You can turn the link off at any time.
+            Shared by {folder.owner_name ?? 'its owner'}. You can add your own links to it; only you can edit them. Your notes stay
+            private.
           </T>
-          <Button label="Create share link" loading={busy} onPress={() => act(() => shareFolder(folder!.id))} />
+          <Members folder={folder} />
+          <Button variant="danger" label="Leave folder" loading={busy} onPress={leave} />
         </>
-      ) : (
-        <>
-          <T variant="label" tone="muted">
-            Public link
-          </T>
-          {url ? (
-            <T selectable>
-              {url}
-            </T>
-          ) : (
-            <T tone="muted">
-              The link is on, but the web app isn’t hosted yet, so there’s no public address to send. Set
-              EXPO_PUBLIC_WEB_URL once the web version is deployed.
-            </T>
-          )}
-          {url ? (
-            <Button
-              label="Copy / share link"
-              onPress={() =>
-                act(async () => {
-                  const r = await shareUrl(url, folder.name);
-                  if (r === 'copied') setNote('Copied to clipboard.');
-                })
-              }
-            />
-          ) : null}
-          <Button variant="danger" label="Turn off link" loading={busy} onPress={() => act(() => unshareFolder(folder.id))} />
-        </>
-      )}
-      {note ? <T variant="small" tone="muted">{note}</T> : null}
+      ) : null}
+      {note ? <T variant="small" tone={note.tone}>{note.text}</T> : null}
     </Sheet>
+  );
+}
+
+function Members({ folder, canRemove }: { folder: Folder; canRemove?: boolean }) {
+  const { getMembers, removeMember } = useStore();
+  const [members, setMembers] = useState<FolderMember[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMembers(folder.id).then(
+      (m) => !cancelled && setMembers(m),
+      (e) => !cancelled && setError(e instanceof Error ? e.message : 'Could not load members'),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [folder.id, folder.member_count, getMembers]);
+
+  async function remove(m: FolderMember) {
+    const ok = await confirm(
+      `Remove ${m.name ?? 'this member'}?`,
+      'They keep a copy of the folder as their own. Links they added stay here.',
+      'Remove',
+    );
+    if (!ok) return;
+    try {
+      await removeMember(folder.id, m.user_id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove member');
+    }
+  }
+
+  return (
+    <View style={{ gap: space.xs }}>
+      <T variant="label" tone="muted">
+        People · {members?.length ?? folder.member_count ?? '…'}
+      </T>
+      {members?.map((m) => (
+        <View key={m.user_id} style={styles.member}>
+          <T style={{ flex: 1 }} numberOfLines={1}>
+            {m.name ?? 'Member'}
+            {m.is_me ? ' (you)' : ''}
+          </T>
+          <T variant="label" tone="muted">
+            {m.role === 'owner' ? 'Owner' : 'Member'}
+          </T>
+          {canRemove && m.role !== 'owner' ? (
+            <Button size="sm" variant="ghost" label="Remove" onPress={() => remove(m)} />
+          ) : null}
+        </View>
+      ))}
+      {error ? <T variant="small" tone="danger">{error}</T> : null}
+    </View>
   );
 }
 
@@ -250,4 +415,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   rowMain: { flex: 1, minWidth: 200, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.lg, paddingRight: space.sm },
   actions: { flexDirection: 'row', gap: space.xs, alignItems: 'center' },
+  buttons: { flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' },
+  member: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 36 },
 });

@@ -31,6 +31,7 @@ type CardLink = {
 export const LinkCard = memo(function LinkCard({
   link,
   folderName,
+  addedBy,
   selecting,
   selected,
   onToggleSelect,
@@ -39,6 +40,8 @@ export const LinkCard = memo(function LinkCard({
 }: {
   link: CardLink;
   folderName?: string;
+  /** Set on another member's link in a shared folder. */
+  addedBy?: string | null;
   selecting?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
@@ -109,6 +112,11 @@ export const LinkCard = memo(function LinkCard({
         {link.labels.length ? (
           <T variant="small" numberOfLines={1} style={{ fontFamily: fonts.medium }}>
             {link.labels.slice(0, 3).map((l) => `#${l}`).join('  ')}
+          </T>
+        ) : null}
+        {addedBy !== undefined ? (
+          <T variant="small" tone="muted" numberOfLines={1}>
+            Added by {addedBy ?? 'a member'}
           </T>
         ) : null}
       </View>

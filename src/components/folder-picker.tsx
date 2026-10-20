@@ -37,7 +37,7 @@ export function FolderPicker({
       <View style={styles.wrap}>
         <Chip label="No folder" active={value === null} onPress={() => onChange(null)} />
         {folders.map((f) => (
-          <Chip key={f.id} label={f.name} active={value === f.id} onPress={() => onChange(f.id)} />
+          <Chip key={f.id} label={f.role ? `${f.name} · shared` : f.name} active={value === f.id} onPress={() => onChange(f.id)} />
         ))}
         {!creating ? <Chip label="+ New folder" onPress={() => setCreating(true)} /> : null}
       </View>

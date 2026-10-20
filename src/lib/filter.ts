@@ -1,5 +1,5 @@
 import type { Platform } from '../../supabase/functions/_shared/url';
-import type { Link } from './types';
+import type { LibraryLink, Link } from './types';
 
 export type SortKey = 'newest' | 'oldest' | 'az' | 'za';
 
@@ -31,7 +31,7 @@ export function displayTitle(link: Link) {
   return link.title || link.shared_text || link.resolved_url || link.url;
 }
 
-export function applyFilter(links: Link[], f: LinkFilter): Link[] {
+export function applyFilter<T extends Link>(links: T[], f: LinkFilter): T[] {
   const terms = f.query.toLowerCase().split(/\s+/).filter(Boolean);
   const out = links.filter((l) => {
     if (f.platform && l.platform !== f.platform) return false;
@@ -47,9 +47,9 @@ export function applyFilter(links: Link[], f: LinkFilter): Link[] {
     return true;
   });
 
-  const byName = (a: Link, b: Link) =>
+  const byName = (a: T, b: T) =>
     displayTitle(a).localeCompare(displayTitle(b), undefined, { sensitivity: 'base' });
-  const compare: Record<SortKey, (a: Link, b: Link) => number> = {
+  const compare: Record<SortKey, (a: T, b: T) => number> = {
     newest: (a, b) => b.created_at.localeCompare(a.created_at),
     oldest: (a, b) => a.created_at.localeCompare(b.created_at),
     az: byName,
@@ -66,9 +66,9 @@ export type AskTerms = { keywords: string[]; labels: string[]; platform: Platfor
  * AI search: links that match any keyword or carry any of the labels, most hits first.
  * Nothing matches → []. `base` is already narrowed by the folder/label filters.
  */
-export function rankByTerms(base: Link[], terms: AskTerms): Link[] {
+export function rankByTerms<T extends Link>(base: T[], terms: AskTerms): T[] {
   const keywords = terms.keywords.map((k) => k.toLowerCase());
-  const scored: { link: Link; score: number }[] = [];
+  const scored: { link: T; score: number }[] = [];
   for (const l of base) {
     if (terms.platform && l.platform !== terms.platform) continue;
     const hay = [l.title, l.description, l.note, l.author, l.shared_text, l.url, ...l.labels]
@@ -95,4 +95,26 @@ export function labelCounts(links: Link[]): [string, number][] {
   const counts = new Map<string, number>();
   for (const l of links) for (const label of l.labels) counts.set(label, (counts.get(label) ?? 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+/**
+ * All links: my links plus other members' links in folders I share, one card per post.
+ * My own copy wins (outside shared folders first); `inFolders` lists every folder the post is in.
+ */
+export function mergeLibrary(own: Link[], joined: LibraryLink[], folderNames: Map<string, string>): LibraryLink[] {
+  const groups = new Map<string, LibraryLink[]>();
+  for (const l of [...own, ...joined]) {
+    const group = groups.get(l.normalized_url);
+    if (group) group.push(l);
+    else groups.set(l.normalized_url, [l]);
+  }
+  const rank = (l: LibraryLink) => (l.added_by !== undefined ? 2 : l.collab_folder_id ? 1 : 0);
+  return [...groups.values()].map((group) => {
+    const best = group.reduce((a, b) => (rank(b) < rank(a) ? b : a));
+    if (group.length === 1) return best;
+    const inFolders = [
+      ...new Set(group.map((l) => (l.folder_id ? folderNames.get(l.folder_id) : undefined)).filter((n): n is string => !!n)),
+    ];
+    return { ...best, inFolders };
+  });
 }

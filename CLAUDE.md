@@ -24,6 +24,10 @@ when scope changes. Setup and commands are in [README.md](README.md).
 - **Selecting:** long-press a card (or "Select") to multi-select; bulk move to folder or delete.
 - **Shared folders:** read-only public page at `/s/<token>`, no sign-in; notes are never exposed;
   the owner can turn the link off.
+- **Collaborative folders:** signed-in people join with an invite link (`/join/<token>`, max 20) and add their
+  own links; only the adder edits a link, the owner can remove any link or member. Notes stay private.
+  Leaving gives the member a private copy; their links stay, handed to the owner. No members left → a normal
+  folder again. All links shows one card per post ("In 2 folders"); "Added by" uses `profiles.display_name`.
 - **Priority:** working features first; a full design pass comes later.
 
 ## Style: Swiss (International Typographic Style)
@@ -50,7 +54,14 @@ no new colors, fonts or one-off sizes, and no `fontWeight` (use `fonts.*`, it's 
   custom tab bar / sidebar; `add`, `link/[id]`, `sign-in`, and the public `s/[token]` outside the tabs.
 - Folder sharing: `share_folder` RPC (security invoker) sets a token; `get_shared_folder` (security
   definer, anon-callable) returns only public fields. Share URLs need `EXPO_PUBLIC_WEB_URL` on phones.
-- `delete-account` edge function removes the user's thumbnails then the auth user (rows cascade).
+- `delete-account` edge function removes the user's thumbnails (except files other users' links still use)
+  then the auth user (rows cascade).
+- Collaborative folders (`20261020000000_collab_folders.sql`): link rows stay owned by the adder and the
+  "own links" RLS is unchanged; members get other people's links only via `get_joined_links()` (no notes).
+  `links.collab_folder_id` scopes uniqueness: `unique nulls not distinct (user_id, normalized_url, collab_folder_id)`
+  + `unique (collab_folder_id, normalized_url)`, so upserts use `onConflict: 'user_id,normalized_url,collab_folder_id'`.
+  Membership changes only through RPCs (`create_invite`, `join_folder`, `leave_folder`, `remove_member`,
+  `remove_folder_link`, …). Copies share thumbnail files: delete a file only if `unused_thumbnails` says so.
 - Data and auth live in `src/lib/store.tsx`. Loading is driven by `onAuthStateChange`
   (the lint rule forbids setState directly in effects).
 

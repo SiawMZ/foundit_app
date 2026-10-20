@@ -26,10 +26,14 @@ links    (id, user_id, url, normalized_url, resolved_url, platform,
           title, description, author, thumbnail_path, shared_text,
           note, labels text[], folder_id → folders, pinned,
           status: pending | ready | failed, error,
-          created_at, updated_at)                               unique(user_id, normalized_url)
+          created_at, updated_at, collab_folder_id)
+          unique nulls not distinct (user_id, normalized_url, collab_folder_id), unique(collab_folder_id, normalized_url)
+folder_members (folder_id, user_id, role: owner | member)     RPC access only
+profiles (id → auth.users, display_name)                        own row; others' names via RPCs
 ```
 
-Row-level security: every row is readable/writable only by its `user_id`.
+Row-level security: every row is readable/writable only by its `user_id`. Members of a collaborative folder
+see each other's links through the `get_joined_links` RPC (public fields only, never notes).
 
 ## Save flow
 
@@ -102,6 +106,20 @@ published yet, so update delivery is still unproven.
       (secrets `ASK_PER_HOUR`, `ASK_PER_DAY`, `ASK_GLOBAL_PER_DAY`), logged in `ask_log` (no question text stored).
 - [ ] Go live: `npx supabase db push` (ask_log), `npx supabase functions deploy ask`, push to `main` (Vercel),
       `npm run update:phone -- "..."` (JS only, no rebuild)
+
+## Phase 5: collaborative folders (2026-10-20)
+
+- [x] Invite link per folder (`/join/<token>`, sign-in required, owner can turn it off, max 20 people)
+- [x] Members add their own links; only the adder edits; the owner removes any link or member
+- [x] All links / search / Ask AI include joined folders, one card per post ("In 2 folders"); "Added by" names
+- [x] Read-only details for others' links with **Save to my library**
+- [x] Leave → private copy of the folder; leaver's links stay (owner takes them, notes cleared);
+      no members left → normal folder again. Deleting a shared folder returns each member's links to them, unfiled
+- [x] Display name in Profile (default: the part of the email before @)
+- [x] Public read-only page lists every member's links
+- [ ] Go live: `npx supabase db push`, `npx supabase functions deploy delete-account`, push to `main`,
+      `npm run update:phone -- "..."` (no rebuild; invite links open the website, which offers "Open in Linkbox")
+- Later: live updates and notifications when someone adds a link; roles beyond owner/member
 
 ## Suggested next
 

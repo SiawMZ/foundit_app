@@ -45,14 +45,16 @@ function BottomBar({ state, navigateToTab, insets }: BottomTabBarProps) {
 
 function Sidebar({ state, navigateToTab, insets }: BottomTabBarProps) {
   const c = useColors();
-  const { folders, links } = useStore();
+  const { folders, links, joinedLinks } = useStore();
   const linksRoute = state.routes.find((r) => r.name === 'index');
   const params = (linksRoute?.params ?? {}) as { folder?: string; label?: string };
   const onLinks = state.routes[state.index]?.name === 'index';
   const activeFolder = onLinks ? params.folder : undefined;
 
   const counts = new Map<string, number>();
-  for (const l of links) if (l.folder_id) counts.set(l.folder_id, (counts.get(l.folder_id) ?? 0) + 1);
+  for (const l of [...links, ...joinedLinks]) if (l.folder_id) counts.set(l.folder_id, (counts.get(l.folder_id) ?? 0) + 1);
+  // All links shows one card per post, mine and other members' in shared folders.
+  const total = new Set([...links, ...joinedLinks].map((l) => l.normalized_url)).size;
 
   return (
     <View style={[styles.side, { backgroundColor: c.bg, borderRightColor: c.line, paddingTop: insets.top + space.xl }]}>
@@ -65,7 +67,7 @@ function Sidebar({ state, navigateToTab, insets }: BottomTabBarProps) {
             <View key={route.key}>
               <SideItem
                 label={LABELS[route.name] ?? route.name}
-                count={route.name === 'index' ? links.length : route.name === 'folders' ? folders.length : undefined}
+                count={route.name === 'index' ? total : route.name === 'folders' ? folders.length : undefined}
                 active={active}
                 onPress={() =>
                   route.name === 'index'

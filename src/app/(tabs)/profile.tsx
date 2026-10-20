@@ -15,7 +15,7 @@ import { pad2, space, useColors } from '@/lib/theme';
 export default function Profile() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { session, links, folders } = useStore();
+  const { session, links, folders, displayName } = useStore();
   const user = session?.user;
 
   const platforms = useMemo(() => {
@@ -58,6 +58,7 @@ export default function Profile() {
 
       <SectionLabel index="02">Account</SectionLabel>
       <View style={{ gap: space.xs }}>
+        <DisplayName key={displayName ?? ''} saved={displayName} />
         <T variant="label" tone="muted">Email</T>
         <T variant="heading">{user?.email}</T>
         {user?.created_at ? (
@@ -87,6 +88,35 @@ function Stat({ value, label }: { value: number; label: string }) {
     <View style={{ flex: 1, gap: space.xs }}>
       <T variant="display">{value}</T>
       <T variant="label" tone="muted">{label}</T>
+    </View>
+  );
+}
+
+/** The name people in my shared folders see ("Added by …"). */
+function DisplayName({ saved }: { saved: string | null }) {
+  const { setDisplayName } = useStore();
+  const [name, setName] = useState(saved ?? '');
+  const [note, setNote] = useState<string | null>(null);
+
+  async function save() {
+    setNote(null);
+    try {
+      await setDisplayName(name);
+      setNote('Saved.');
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Could not save');
+    }
+  }
+
+  return (
+    <View style={{ gap: space.sm, paddingBottom: space.md }}>
+      <View style={styles.inline}>
+        <View style={{ flex: 1 }}>
+          <Field label="Name in shared folders" value={name} onChangeText={setName} maxLength={40} onSubmitEditing={save} />
+        </View>
+        <Button label="Save" variant="secondary" disabled={!name.trim() || name.trim() === saved} onPress={save} />
+      </View>
+      {note ? <T variant="small" tone="muted">{note}</T> : null}
     </View>
   );
 }
@@ -126,14 +156,15 @@ function ChangePassword() {
 }
 
 function ExportButton() {
-  const { links, folders } = useStore();
+  const { session, links, folders } = useStore();
   const [note, setNote] = useState<string | null>(null);
 
   async function exportData() {
     const folderNames = new Map(folders.map((f) => [f.id, f.name]));
     const data = {
       exported_at: new Date().toISOString(),
-      folders: folders.map((f) => ({ name: f.name, created_at: f.created_at })),
+      // My own folders; a link I added to someone else's shared folder keeps that folder's name.
+      folders: folders.filter((f) => f.user_id === session?.user.id).map((f) => ({ name: f.name, created_at: f.created_at })),
       links: links.map((l) => ({
         url: l.resolved_url ?? l.url,
         original_url: l.url,

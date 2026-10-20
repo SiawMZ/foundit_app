@@ -9,7 +9,8 @@ import { LinkCard } from '@/components/link-card';
 import { Button, Chip, Field, Rule, ScreenHeader, Sheet, T } from '@/components/ui';
 import { confirm } from '@/lib/confirm';
 import { askSearch } from '@/lib/ask';
-import { applyFilter, rankByTerms, SORT_LABELS, type AskTerms, type SortKey } from '@/lib/filter';
+import { takePendingJoin } from '@/lib/join';
+import { applyFilter, mergeLibrary, rankByTerms, SORT_LABELS, type AskTerms, type SortKey } from '@/lib/filter';
 import { useStore } from '@/lib/store';
 import { pad2, space, useColors, useIsWide } from '@/lib/theme';
 
@@ -21,7 +22,7 @@ export default function Links() {
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
   const { width } = useWindowDimensions();
-  const { links, folders, loading, refresh, moveLinks, deleteLinks, queued, retryQueued } = useStore();
+  const { links, joinedLinks, folders, loading, refresh, moveLinks, deleteLinks, queued, retryQueued } = useStore();
 
   // Folder and label filters live in the URL so the sidebar, Folders tab and Tags tab can set them.
   const params = useLocalSearchParams<{ folder?: string; label?: string }>();
@@ -42,6 +43,12 @@ export default function Links() {
   const selecting = selected !== null;
   const list = useRef<FlatList>(null);
 
+  // Signed in from an invite page (sign-in always lands here): go back to the invite.
+  useEffect(() => {
+    const token = takePendingJoin();
+    if (token) router.push({ pathname: '/join/[token]', params: { token } });
+  }, []);
+
   // Opening a folder or tag from another tab should start at the top of the list.
   useEffect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: false });
@@ -50,26 +57,36 @@ export default function Links() {
   const contentWidth = Math.min(width - (wide ? 260 : 0), MAX_WIDTH);
   const columns = Math.max(2, Math.floor((contentWidth - space.xl * 2) / 230));
 
-  const visible = useMemo(() => {
-    if (!ai) return applyFilter(links, { query, platform, folder, label, sort });
-    // In AI mode the typed question is not a filter; only the returned terms are.
-    const base = applyFilter(links, { query: '', platform, folder, label, sort });
-    return asked ? rankByTerms(base, asked) : base;
-  }, [links, query, platform, folder, label, sort, ai, asked]);
-  const platforms = useMemo(() => [...new Set(links.map((l) => l.platform))].sort() as Platform[], [links]);
   const folderNames = useMemo(() => new Map(folders.map((f) => [f.id, f.name])), [folders]);
+  // A folder shows every copy in it (mine and other members'); everywhere else one card per post.
+  const library = useMemo(
+    () =>
+      typeof folder === 'string' ? [...links, ...joinedLinks] : folder === null ? links : mergeLibrary(links, joinedLinks, folderNames),
+    [links, joinedLinks, folder, folderNames],
+  );
+  const mine = useMemo(() => new Set(links.map((l) => l.id)), [links]);
+
+  const visible = useMemo(() => {
+    if (!ai) return applyFilter(library, { query, platform, folder, label, sort });
+    // In AI mode the typed question is not a filter; only the returned terms are.
+    const base = applyFilter(library, { query: '', platform, folder, label, sort });
+    return asked ? rankByTerms(base, asked) : base;
+  }, [library, query, platform, folder, label, sort, ai, asked]);
+  const visibleMine = useMemo(() => visible.filter((l) => mine.has(l.id)), [visible, mine]);
+  const platforms = useMemo(() => [...new Set(library.map((l) => l.platform))].sort() as Platform[], [library]);
 
   const title = folder ? (folderNames.get(folder) ?? 'Folder') : folder === null ? 'Unfiled' : label ? `#${label}` : 'All links';
 
   const toggle = useCallback((id: string) => {
+    if (!mine.has(id)) return;
     setSelected((prev) => {
       const next = new Set(prev ?? []);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }, []);
-  const startSelect = useCallback((id: string) => setSelected(new Set([id])), []);
+  }, [mine]);
+  const startSelect = useCallback((id: string) => setSelected(mine.has(id) ? new Set([id]) : new Set()), [mine]);
 
   function toggleAi() {
     setAi(!ai);
@@ -206,7 +223,7 @@ export default function Links() {
       </ScrollView>
       {selecting ? (
         <T variant="small" tone="muted">
-          Tap cards to select them.
+          Tap cards to select them.{joinedLinks.length ? ' Links other people added can’t be selected.' : ''}
         </T>
       ) : null}
     </View>
@@ -221,18 +238,28 @@ export default function Links() {
         numColumns={columns}
         keyExtractor={(l) => l.id}
         columnWrapperStyle={{ gap: space.lg }}
-        renderItem={({ item }) => (
-          <View style={{ flex: 1 / columns, maxWidth: `${100 / columns}%` }}>
-            <LinkCard
-              link={item}
-              folderName={item.folder_id && !folder ? folderNames.get(item.folder_id) : undefined}
-              selecting={selecting}
-              selected={selected?.has(item.id)}
-              onToggleSelect={toggle}
-              onStartSelect={startSelect}
-            />
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const own = mine.has(item.id);
+          const inFolders = item.inFolders?.length ?? 0;
+          return (
+            // Other members' links can't be selected (bulk actions only touch my own links).
+            <View
+              style={{ flex: 1 / columns, maxWidth: `${100 / columns}%`, opacity: selecting && !own ? 0.35 : 1 }}
+              pointerEvents={selecting && !own ? 'none' : 'auto'}>
+              <LinkCard
+                link={item}
+                folderName={
+                  inFolders > 1 ? `In ${inFolders} folders` : item.folder_id && !folder ? folderNames.get(item.folder_id) : undefined
+                }
+                addedBy={item.added_by}
+                selecting={selecting && own}
+                selected={selected?.has(item.id)}
+                onToggleSelect={toggle}
+                onStartSelect={own ? startSelect : undefined}
+              />
+            </View>
+          );
+        }}
         ListHeaderComponent={header}
         ListEmptyComponent={
           loading ? undefined : (
@@ -264,8 +291,10 @@ export default function Links() {
           <Button
             size="sm"
             variant="ghost"
-            label={selected.size === visible.length ? 'None' : 'All'}
-            onPress={() => setSelected(selected.size === visible.length ? new Set() : new Set(visible.map((l) => l.id)))}
+            label={selected.size === visibleMine.length ? 'None' : 'All'}
+            onPress={() =>
+              setSelected(selected.size === visibleMine.length ? new Set() : new Set(visibleMine.map((l) => l.id)))
+            }
           />
           <Button size="sm" variant="danger" label="Delete" disabled={!selected.size} onPress={removeSelected} />
           <Button size="sm" label="Move to folder" disabled={!selected.size} onPress={() => setMoving(true)} />

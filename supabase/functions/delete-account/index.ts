@@ -23,15 +23,28 @@ Deno.serve(async (req) => {
   const userId = data.user.id;
 
   try {
-    // Thumbnails live under {user_id}/ in the thumbnails bucket.
-    for (;;) {
-      const { data: files, error: listError } = await admin.storage.from('thumbnails').list(userId, { limit: 1000 });
+    // Thumbnails live under {user_id}/ in the thumbnails bucket. Files that other people's links still
+    // use (links this user added to a shared folder, or copies) are kept.
+    const { data: shared, error: sharedError } = await admin
+      .from('links')
+      .select('thumbnail_path')
+      .like('thumbnail_path', `${userId}/%`)
+      .neq('user_id', userId);
+    if (sharedError) throw sharedError;
+    const keep = new Set((shared ?? []).map((r) => r.thumbnail_path as string));
+    for (let offset = 0; ; offset += 1000) {
+      const { data: files, error: listError } = await admin.storage
+        .from('thumbnails')
+        .list(userId, { limit: 1000, offset });
       if (listError) throw listError;
       if (!files?.length) break;
-      const { error: removeError } = await admin.storage
-        .from('thumbnails')
-        .remove(files.map((f) => `${userId}/${f.name}`));
-      if (removeError) throw removeError;
+      const remove = files.map((f) => `${userId}/${f.name}`).filter((p) => !keep.has(p));
+      if (remove.length) {
+        const { error: removeError } = await admin.storage.from('thumbnails').remove(remove);
+        if (removeError) throw removeError;
+        // Removed files shift the listing; kept ones stay, so page past them.
+        offset -= remove.length;
+      }
       if (files.length < 1000) break;
     }
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);

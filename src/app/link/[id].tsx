@@ -11,14 +11,18 @@ import { confirm } from '@/lib/confirm';
 import { openLink, thumbnailUrl } from '@/lib/open';
 import { useStore } from '@/lib/store';
 import { space, useColors } from '@/lib/theme';
+import type { LibraryLink } from '@/lib/types';
 
 export default function LinkDetail() {
   const c = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { links, updateLink, deleteLink, enrich } = useStore();
+  const { links, joinedLinks, folders, updateLink, deleteLink, enrich } = useStore();
   const link = links.find((l) => l.id === id);
+  const shared = link ? undefined : joinedLinks.find((l) => l.id === id);
 
   const [error, setError] = useState<string | null>(null);
+
+  if (shared) return <SharedLinkDetail link={shared} />;
 
   if (!link) {
     return (
@@ -77,6 +81,11 @@ export default function LinkDetail() {
         <View style={{ gap: space.sm }}>
           <SectionLabel index="02">Folder</SectionLabel>
           <FolderPicker value={link.folder_id} onChange={(folder_id) => save({ folder_id })} />
+          {folders.find((f) => f.id === link.folder_id)?.role ? (
+            <T variant="small" tone="muted">
+              This folder is shared: its members see this link, but not your note.
+            </T>
+          ) : null}
         </View>
 
         <SavedField
@@ -106,6 +115,69 @@ export default function LinkDetail() {
           />
         </View>
         <Button variant="danger" label="Delete" onPress={remove} />
+    </Frame>
+  );
+}
+
+/** Another member's link in a shared folder: read-only, with a copy to my own library. */
+function SharedLinkDetail({ link }: { link: LibraryLink }) {
+  const c = useColors();
+  const { folders, saveCopy, removeFolderLink } = useStore();
+  const [note, setNote] = useState<{ text: string; tone: 'muted' | 'danger' } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const folder = folders.find((f) => f.id === link.folder_id);
+  const isOwner = folder?.role === 'owner';
+
+  async function act(fn: () => Promise<unknown>, done: string) {
+    setBusy(true);
+    setNote(null);
+    try {
+      await fn();
+      setNote({ text: done, tone: 'muted' });
+    } catch (e) {
+      setNote({ text: e instanceof Error ? e.message : 'Something went wrong', tone: 'danger' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (await confirm('Remove from folder?', `It’s removed from “${folder?.name ?? 'this folder'}” for everyone.`)) {
+      await act(() => removeFolderLink(link.id), 'Removed.');
+      close();
+    }
+  }
+
+  return (
+    <Frame title={PLATFORM_NAMES[link.platform]}>
+      {thumbnailUrl(link) ? (
+        <Image source={thumbnailUrl(link)} style={[styles.image, { backgroundColor: c.surface }]} contentFit="cover" />
+      ) : null}
+
+      <Button label={`Open in ${PLATFORM_NAMES[link.platform]}`} onPress={() => openLink(link)} />
+
+      <View style={{ gap: space.xs }}>
+        <T variant="label" tone="muted">
+          Added by {link.added_by ?? 'a member'}
+          {folder ? ` · ${folder.name}` : ''} · {new Date(link.created_at).toLocaleDateString()}
+          {link.author ? ` · ${link.author}` : ''}
+        </T>
+        {link.title ? <T variant="heading">{link.title}</T> : null}
+        {link.description ? <T>{link.description}</T> : null}
+        {link.labels.length ? (
+          <T variant="small">{link.labels.map((l) => `#${l}`).join('  ')}</T>
+        ) : null}
+        <T variant="small" tone="muted" numberOfLines={2} selectable>
+          {link.resolved_url ?? link.url}
+        </T>
+      </View>
+
+      <T variant="small" tone="muted">
+        Only {link.added_by ?? 'the person who added it'} can edit this link. Save a copy to add your own labels and notes.
+      </T>
+      <Button variant="secondary" label="Save to my library" loading={busy} onPress={() => act(() => saveCopy(link), 'Saved to your library.')} />
+      {isOwner ? <Button variant="danger" label="Remove from folder" onPress={remove} /> : null}
+      {note ? <T variant="small" tone={note.tone}>{note.text}</T> : null}
     </Frame>
   );
 }
