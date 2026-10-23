@@ -182,18 +182,20 @@ async function fetchPreview(url: string, platform: Platform): Promise<Preview> {
     if (!blocked && res.ok && (res.headers.get('content-type') ?? '').includes('html')) {
       const html = await readLimited(res, MAX_HTML_BYTES);
       const meta = parseMeta(html, resolvedUrl);
-      // Xiaohongshu has no Open Graph tags; the post is embedded as JSON in the page.
+      // Xiaohongshu: the post is embedded as JSON in the page. Prefer it to the page's Open Graph tags,
+      // whose og:image (since 2026-10) is a ci.xiaohongshu.com proxy link that returns 404, and whose
+      // og:title ends in " - 小红书".
       const embedded = platform === 'xiaohongshu' ? parseXiaohongshuState(html) : {};
       page = {
         resolvedUrl,
-        title: meta.title ?? embedded.title,
-        description: meta.description ?? embedded.description,
+        title: embedded.title ?? meta.title,
+        description: embedded.description ?? meta.description,
         // Threads reports og:site_name ("Threads"); the handle is in the title ("@name on Threads").
         author:
           (platform === 'threads' ? meta.title?.match(/^(@\S+) on Threads/)?.[1] : undefined) ??
-          meta.author ??
-          embedded.author,
-        image: meta.image ?? embedded.image,
+          embedded.author ??
+          meta.author,
+        image: embedded.image ?? meta.image,
       };
     } else {
       res.body?.cancel().catch(() => {});
