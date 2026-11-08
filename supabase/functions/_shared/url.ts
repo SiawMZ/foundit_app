@@ -26,7 +26,8 @@ export const PLATFORM_NAMES: Record<Platform, string> = {
 const PLATFORM_HOSTS: [Platform, string[]][] = [
   ['instagram', ['instagram.com', 'instagr.am']],
   ['tiktok', ['tiktok.com', 'tiktokv.com']],
-  ['xiaohongshu', ['xiaohongshu.com', 'xhslink.com']],
+  // rednote.com: Xiaohongshu's international site; xiaohongshu.com pages redirect there since 2026-11.
+  ['xiaohongshu', ['xiaohongshu.com', 'xhslink.com', 'rednote.com']],
   ['facebook', ['facebook.com', 'fb.com', 'fb.watch']],
   ['youtube', ['youtube.com', 'youtu.be']],
   ['x', ['x.com', 'twitter.com']],

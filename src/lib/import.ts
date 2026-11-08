@@ -10,7 +10,7 @@ const POST_PATTERNS: RegExp[] = [
   /instagram\.com\/(?:[\w.]+\/)?(?:p|reel|reels|tv)\/[\w-]+/i,
   /tiktokv?\.com\/(?:@[\w.-]+\/(?:video|photo)\/\d+|share\/video\/\d+|v\/\d+)/i,
   /(?:vm|vt)\.tiktok\.com\/\w+/i,
-  /xiaohongshu\.com\/(?:explore|discovery\/item)\/[0-9a-f]{16,}/i,
+  /(?:xiaohongshu|rednote)\.com\/(?:explore|discovery\/item)\/[0-9a-f]{16,}/i,
   /xhslink\.com\/\w+/i,
   /youtube\.com\/(?:watch\?(?:.*&)?v=[\w-]+|shorts\/[\w-]+)/i,
   /youtu\.be\/[\w-]+/i,

@@ -178,7 +178,9 @@ async function fetchPreview(url: string, platform: Platform): Promise<Preview> {
     // (google.com/sorry, xiaohongshu.com/login …).
     const blocked =
       (platform !== 'web' && detectPlatform(finalUrl) !== platform) || isLoginPage(finalUrl);
-    if (!blocked) resolvedUrl = finalUrl;
+    // Keep Xiaohongshu posts on xiaohongshu.com even when the page redirected to rednote.com: that's the
+    // address the Xiaohongshu app opens on Android.
+    if (!blocked) resolvedUrl = platform === 'xiaohongshu' ? toXiaohongshuHost(finalUrl) : finalUrl;
     if (!blocked && res.ok && (res.headers.get('content-type') ?? '').includes('html')) {
       const html = await readLimited(res, MAX_HTML_BYTES);
       const meta = parseMeta(html, resolvedUrl);
@@ -263,6 +265,16 @@ function parseMeta(html: string, baseUrl: string): Omit<Preview, 'resolvedUrl'> 
     author: meta(['author', 'article:author', 'og:site_name']),
     image: image ? new URL(image, baseUrl).toString() : undefined,
   };
+}
+
+function toXiaohongshuHost(url: string) {
+  try {
+    const u = new URL(url);
+    if (/(^|\.)rednote\.com$/i.test(u.hostname)) u.hostname = 'www.xiaohongshu.com';
+    return u.toString();
+  } catch {
+    return url;
+  }
 }
 
 function isLoginPage(url: string) {
