@@ -38,8 +38,12 @@ type Preview = {
   title?: string;
   description?: string;
   author?: string;
-  image?: string;
+  /** Image candidates, best first. Each is tried until one downloads (platforms change their pages). */
+  images?: string[];
 };
+
+/** At most this many image candidates are tried per link. */
+const MAX_IMAGE_TRIES = 4;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -89,9 +93,11 @@ Deno.serve(async (req) => {
     const preview = await fetchPreview(link.url, link.platform as Platform);
     const platform = link.platform === 'web' ? detectPlatform(preview.resolvedUrl) : link.platform;
 
-    const thumbnail = preview.image
-      ? await storeThumbnail(adminDb, preview.image, `${link.user_id}/${link.id}`)
-      : null;
+    let thumbnail: string | null = null;
+    for (const image of (preview.images ?? []).slice(0, MAX_IMAGE_TRIES)) {
+      thumbnail = await storeThumbnail(adminDb, image, `${link.user_id}/${link.id}`);
+      if (thumbnail) break;
+    }
 
     const ai = aiAllowed
       ? await describe({
@@ -197,7 +203,7 @@ async function fetchPreview(url: string, platform: Platform): Promise<Preview> {
           (platform === 'threads' ? meta.title?.match(/^(@\S+) on Threads/)?.[1] : undefined) ??
           embedded.author ??
           meta.author,
-        image: embedded.image ?? meta.image,
+        images: [...(embedded.images ?? []), ...(meta.images ?? [])],
       };
     } else {
       res.body?.cancel().catch(() => {});
@@ -216,7 +222,7 @@ async function fetchPreview(url: string, platform: Platform): Promise<Preview> {
     title: oembed?.title || page.title,
     description: page.description,
     author: oembed?.author || page.author,
-    image: oembed?.image || page.image,
+    images: [...new Set([...(oembed?.image ? [oembed.image] : []), ...(page.images ?? [])])],
   };
 }
 
@@ -258,12 +264,21 @@ function parseMeta(html: string, baseUrl: string): Omit<Preview, 'resolvedUrl'> 
     return undefined;
   };
   const titleTag = head.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1];
-  const image = meta(['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src']);
+  const images = ['og:image', 'og:image:url', 'og:image:secure_url', 'twitter:image', 'twitter:image:src']
+    .map((name) => meta([name]))
+    .filter((u): u is string => !!u)
+    .flatMap((u) => {
+      try {
+        return [new URL(u, baseUrl).toString()];
+      } catch {
+        return [];
+      }
+    });
   return {
     title: meta(['og:title', 'twitter:title']) ?? (titleTag ? decodeEntities(titleTag.trim()) : undefined),
     description: meta(['og:description', 'twitter:description', 'description']),
     author: meta(['author', 'article:author', 'og:site_name']),
-    image: image ? new URL(image, baseUrl).toString() : undefined,
+    images: [...new Set(images)],
   };
 }
 
@@ -299,12 +314,19 @@ function parseXiaohongshuState(html: string): Omit<Preview, 'resolvedUrl'> {
       return undefined;
     }
   };
-  const image = str(/"imageList":\[\{[^\]]*?"url":"((?:[^"\\]|\\.)*)"/);
+  // The first image's main URL, then its other renditions as fallbacks.
+  const images = [
+    str(/"imageList":\[\{[^\]]*?"url":"((?:[^"\\]|\\.)*)"/),
+    str(/"imageList":\[\{[^\]]*?"urlDefault":"((?:[^"\\]|\\.)*)"/),
+    str(/"imageList":\[\{[^\]]*?"urlPre":"((?:[^"\\]|\\.)*)"/),
+  ]
+    .filter((u): u is string => !!u)
+    .map((u) => u.replace(/^http:/, 'https:'));
   return {
     title: str(/"title":"((?:[^"\\]|\\.)+)","interactInfo"/) ?? str(/"title":"((?:[^"\\]|\\.)+)"/),
     description: str(/"desc":"((?:[^"\\]|\\.)+)"/)?.slice(0, 500),
     author: str(/"nickname":"((?:[^"\\]|\\.)+)"/),
-    image: image?.replace(/^http:/, 'https:'),
+    images: [...new Set(images)],
   };
 }
 
@@ -449,6 +471,7 @@ async function storeThumbnail(
     const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
     if (!res.ok || !IMAGE_TYPES.includes(type)) {
       res.body?.cancel().catch(() => {});
+      console.warn('thumbnail refused', res.status, type, imageUrl.slice(0, 200));
       return null;
     }
     const { bytes, truncated } = await readBytes(res, MAX_IMAGE_BYTES);
